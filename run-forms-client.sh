@@ -9,8 +9,10 @@
 # The JVM: on macOS the installed JDK of that version, else $JAVA_HOME if
 # set, else `java` on the PATH. FSAL runs the client with `java -jar frmsal.jar`, so
 # we pick the JVM (OpenWebStart ignores the JNLP's Java version and stays on
-# Java 8). JCEF needs the --add-opens flags below on Java 17+. The bean writes
-# diagnostics to ~/hybrid-bean.log. Start hello-view first (localhost:8080).
+# Java 8). JCEF needs the --add-opens flags below on Java 17+. For the bean's
+# trace in ~/hybrid-bean.log and swing-kit's debug logging:
+#   JAVA_OPTS=-Dhybrid.debug=true ./run-forms-client.sh
+# Start hello-view first (localhost:8080).
 set -euo pipefail
 
 JAVA_VERSION=${1:-21}

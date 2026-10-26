@@ -89,8 +89,9 @@ public class VaadinBean extends VBean {
     public void init(IHandler handler) {
         super.init(handler);
         this.handler = handler;
+        BeanLog.configure();
         BeanLog.captureUncaughtExceptions();
-        BeanLog.log("init");
+        BeanLog.debug("init");
         // Cards switch by visibility only: the browser is never removed, which
         // would destroy its native window.
         setLayout(cards);
@@ -122,13 +123,13 @@ public class VaadinBean extends VBean {
     private void startPanel() {
         String url = System.getProperty("hybrid.url", DEFAULT_URL);
         try {
-            BeanLog.log("building panel for " + url);
+            BeanLog.debug("building panel for " + url);
             JVaadinPanel p = SwingVaadinClient.getBuilder().build(url);
             p.addEventListener(HybridEvents.READY, e -> onViewReady());
             p.addEventListener(HybridEvents.GREET, this::onGreet);
             p.addEventListener(HybridEvents.ORDER_SAVED, this::onOrderSaved);
             panel = p;
-            BeanLog.log("panel built, isReady=" + p.isReady());
+            BeanLog.debug("panel built, isReady=" + p.isReady());
             EventQueue.invokeLater(() -> {
                 add(p, VIEW_CARD);
                 cards.show(this, VIEW_CARD);
@@ -139,7 +140,7 @@ public class VaadinBean extends VBean {
             EventQueue.invokeLater(this::watchFormsDialogs);
             EventQueue.invokeLater(() -> keyboard = BrowserKeyboard.install(p));
         } catch (Throwable t) {
-            BeanLog.log("panel build failed", t);
+            BeanLog.warn("panel build failed", t);
             EventQueue.invokeLater(() -> status.setText("Vaadin view unavailable: " + t));
         }
     }
@@ -156,7 +157,7 @@ public class VaadinBean extends VBean {
         FWindow own = ancestor(this, FWindow.class);
         Container desktop = own == null ? null : own.getParent();
         if (desktop == null) {
-            BeanLog.log("no Forms window found: dialogs won't be watched");
+            BeanLog.warn("no Forms window found: dialogs won't be watched");
             return;
         }
         dialogWatcher = e -> {
@@ -183,7 +184,7 @@ public class VaadinBean extends VBean {
             }
         }
         if (covered == p.isVisible()) {
-            BeanLog.log(covered ? "Forms dialog over the view: hiding the browser" : "Forms dialog closed: showing the browser");
+            BeanLog.debug(covered ? "Forms dialog over the view: hiding the browser" : "Forms dialog closed: showing the browser");
             if (covered && keyboard != null) {
                 keyboard.formsTookFocus();
             }
@@ -205,8 +206,8 @@ public class VaadinBean extends VBean {
 
     @Override
     public boolean setProperty(ID id, Object value) {
-        BeanLog.log("setProperty " + id + " = " + value);
         if (id == CUSTOMER) {
+            BeanLog.debug("setProperty CUSTOMER = " + value);
             String[] parts = String.valueOf(value).split("\\|", 2);
             currentCustomer = new String[] { parts[0], parts.length > 1 ? parts[1] : "" };
             pushCustomer();
@@ -231,7 +232,7 @@ public class VaadinBean extends VBean {
 
     /** The form usually sends the first customer before the view has loaded: replay it on ready. */
     private void onViewReady() {
-        BeanLog.log("view ready event");
+        BeanLog.debug("view ready event");
         viewReady = true;
         pushCustomer();
     }
@@ -242,30 +243,30 @@ public class VaadinBean extends VBean {
         // The view's ready event can fire while build() is still loading the page,
         // before our listener exists, so swing-kit's own load state counts too.
         if (customer == null || p == null || !(viewReady || p.isReady())) {
-            BeanLog.log("pushCustomer deferred: customer=" + (customer != null) + " panel="
+            BeanLog.debug("pushCustomer deferred: customer=" + (customer != null) + " panel="
                     + (p != null) + " viewReady=" + viewReady + " isReady=" + (p != null && p.isReady()));
             return;
         }
         calls.submit(() -> {
             try {
-                BeanLog.log("calling showCustomer(" + customer[0] + ", " + customer[1] + ")");
+                BeanLog.debug("calling showCustomer(" + customer[0] + ", " + customer[1] + ")");
                 p.as(HelloCallable.class).showCustomer(customer[0], customer[1]);
-                BeanLog.log("showCustomer returned");
+                BeanLog.debug("showCustomer returned");
             } catch (Throwable t) {
-                BeanLog.log("showCustomer failed", t);
+                BeanLog.warn("showCustomer failed", t);
             }
         });
     }
 
     private void onGreet(VaadinSwingEvent event) {
-        BeanLog.log("greet event " + event.getParams());
+        BeanLog.debug("greet event " + event.getParams());
         Serializable message = event.getParams().get(HybridEvents.MESSAGE);
         greeting = message == null ? "" : message.toString();
         EventQueue.invokeLater(() -> dispatchCustomEvent(new CustomEvent(handler, GREET)));
     }
 
     private void onOrderSaved(VaadinSwingEvent event) {
-        BeanLog.log("orderSaved event " + event.getParams());
+        BeanLog.debug("orderSaved event " + event.getParams());
         orderCustomerId = String.valueOf(event.getParams().get(HybridEvents.CUSTOMER_ID));
         ordersTotal = String.valueOf(event.getParams().get(HybridEvents.TOTAL));
         EventQueue.invokeLater(() -> dispatchCustomEvent(new CustomEvent(handler, ORDER_SAVED)));

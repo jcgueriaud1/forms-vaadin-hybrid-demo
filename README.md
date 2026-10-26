@@ -67,8 +67,10 @@ The short version, once the Forms server is running:
 ./run-forms-client.sh       # the Forms client on Java 21 (Windows: run-forms-client.cmd)
 ```
 
-The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`. The bean writes
-diagnostics to `~/hybrid-bean.log`.
+The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`. The bean reports
+problems on the client's console. For a trace of what it does, start the client
+with `JAVA_OPTS=-Dhybrid.debug=true`: the bean then writes `~/hybrid-bean.log`
+and swing-kit logs its calls and events (at debug level) on the console.
 
 ## Gotchas
 
@@ -102,6 +104,13 @@ diagnostics to `~/hybrid-bean.log`.
   the browser, but not always on the panel's own components), consumes Forms'
   key events while the view has it, and sends the macOS edit shortcuts to the
   browser's focused frame. A page load doesn't take the keyboard from Forms.
+- **`Exception in thread "AppKit Thread"` on macOS is harmless.** It's printed
+  when the view gets focus. JCEF's `CefClient.onGotFocus` calls
+  `browser.setFocus(true)`, which on macOS fires `onGotFocus` again, until a
+  `StackOverflowError` ends the loop; focus ends up right. It's a JCEF bug
+  (jcefmaven 135); the bean's own focus handler does no work on that stack.
+  swing-kit's `Result is missing` warning for `void` calls (`showCustomer`) is
+  harmless too.
 - **Colours in the form XML.** Use names from Forms' default palette (`white`,
   `r25g25b50`…). Forms XML keeps only colour names, so a custom palette colour
   isn't recreated, and any unknown name renders black.

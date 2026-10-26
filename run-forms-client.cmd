@@ -6,6 +6,7 @@ rem   run-forms-client.cmd
 rem   set JAVA_HOME=C:\path\to\jdk-21 & run-forms-client.cmd
 rem
 rem Uses %JAVA_HOME%\bin\java if JAVA_HOME is set, else java on the PATH.
+rem Debug trace (%USERPROFILE%\hybrid-bean.log): set JAVA_OPTS=-Dhybrid.debug=true
 rem Start hello-view first (localhost:8080).
 setlocal
 if "%HYBRID_FORMS_URL%"=="" set HYBRID_FORMS_URL=http://localhost:7777/forms

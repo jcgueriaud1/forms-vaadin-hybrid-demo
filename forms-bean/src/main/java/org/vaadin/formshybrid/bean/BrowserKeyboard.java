@@ -2,6 +2,7 @@ package org.vaadin.formshybrid.bean;
 
 import java.awt.AWTEvent;
 import java.awt.Component;
+import java.awt.EventQueue;
 import java.awt.KeyEventDispatcher;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
@@ -57,7 +58,7 @@ final class BrowserKeyboard {
     static BrowserKeyboard install(JVaadinPanel panel) {
         CefBrowser browser = browserOf(panel);
         if (browser == null) {
-            BeanLog.log("no CefBrowser found: keyboard handling for the view not installed");
+            BeanLog.warn("no CefBrowser found: keyboard handling for the view not installed");
             return null;
         }
         BrowserKeyboard keyboard = new BrowserKeyboard(panel, browser);
@@ -69,14 +70,19 @@ final class BrowserKeyboard {
                 return source == FocusSource.FOCUS_SOURCE_NAVIGATION;
             }
 
+            // These run on the AppKit thread. On macOS, JCEF's CefClient.onGotFocus
+            // calls setFocus, which fires onGotFocus again: it recurses until a
+            // StackOverflowError (the "Exception in thread AppKit Thread" lines),
+            // and this handler runs at the bottom of that stack. So do no work
+            // here, just hand it to the AWT thread.
             @Override
             public void onGotFocus(CefBrowser b) {
-                keyboard.setBrowserFocused(true, "browser got focus");
+                EventQueue.invokeLater(() -> keyboard.setBrowserFocused(true, "browser got focus"));
             }
 
             @Override
             public void onTakeFocus(CefBrowser b, boolean next) {
-                keyboard.setBrowserFocused(false, "Tab left the page");
+                EventQueue.invokeLater(() -> keyboard.setBrowserFocused(false, "Tab left the page"));
             }
         });
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyboard.keys);
@@ -98,7 +104,7 @@ final class BrowserKeyboard {
     private void setBrowserFocused(boolean focused, String why) {
         if (browserFocused != focused) {
             browserFocused = focused;
-            BeanLog.log("keyboard " + (focused ? "to the view" : "back to Forms") + ": " + why);
+            BeanLog.debug("keyboard " + (focused ? "to the view" : "back to Forms") + ": " + why);
         }
     }
 
@@ -182,11 +188,11 @@ final class BrowserKeyboard {
             } catch (NoSuchFieldException e) {
                 // not declared here: try the superclass
             } catch (ReflectiveOperationException | RuntimeException e) {
-                BeanLog.log("cannot reach swing-kit's CefBrowser", e);
+                BeanLog.warn("cannot reach swing-kit's CefBrowser", e);
                 return null;
             }
         }
-        BeanLog.log("swing-kit's panel has no cefBrowser field");
+        BeanLog.warn("swing-kit's panel has no cefBrowser field");
         return null;
     }
 }

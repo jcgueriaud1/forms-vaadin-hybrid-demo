@@ -175,10 +175,11 @@ orders.
 | The bean area shows a browser error page | The Vaadin view isn't running | Start step 5, then restart the client |
 | A Vaadin licence screen inside the Forms window | No Vaadin licence key | Step 4 |
 | The view shows "Not found in the database." or the greeting never appears; the view's log shows `HikariPool` or `ORA-` errors | The view can't reach the demo schema | Check port 1521 is published and `setup-db.sh` ran; set `HYBRID_JDBC_URL` if your database differs |
-| Clicking customers changes nothing in the view | The view isn't connected, or calls are blocked | Look at `~/hybrid-bean.log` |
+| Clicking customers changes nothing in the view | The view isn't connected, or calls are blocked | Restart the client with `JAVA_OPTS=-Dhybrid.debug=true ./run-forms-client.sh` and look at `~/hybrid-bean.log` and swing-kit's lines on the console |
 | A Forms alert seems to be missing and Forms doesn't respond | An old bean that lets the browser cover Forms dialogs | Redeploy the bean (`./deploy-bean.sh`) and restart the client: the current bean replaces the view with "Answer the Forms dialog to continue." while a dialog is open |
 | After redeploying the bean, Forms ignores new events (e.g. the Orders total doesn't update) | The standalone launcher keeps using its cached `hybrid-bean.jar` | Start the client with `run-forms-client.sh` / `.cmd`, which deletes that cached jar first |
-| Arrow keys in the view also move the Forms record, or Cmd+C/V do nothing in a Vaadin field (macOS) | An old bean without the keyboard handling | Redeploy the bean and restart the client with `run-forms-client.sh`; `~/hybrid-bean.log` shows "keyboard to the view" / "keyboard back to Forms" as you click |
+| Arrow keys in the view also move the Forms record, or Cmd+C/V do nothing in a Vaadin field (macOS) | An old bean without the keyboard handling | Redeploy the bean and restart the client with `run-forms-client.sh`; with `-Dhybrid.debug=true`, `~/hybrid-bean.log` shows "keyboard to the view" / "keyboard back to Forms" as you click |
+| `Exception in thread "AppKit Thread"` on the console (macOS) | A JCEF focus bug when the view gets focus | Harmless; see the README's gotchas |
 | Accented names show without accents | Missing `NLS_LANG` | Re-run `./deploy-form.sh` |
 
 ## Report back (acceptance test for #1)

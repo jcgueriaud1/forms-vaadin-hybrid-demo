@@ -22,6 +22,14 @@
             <artifactId>vaadin-swing-kit-client</artifactId>
             <version>${swing-kit.version}</version>
         </dependency>
+        <!-- swing-kit logs through SLF4J; without a provider its logs are dropped.
+             BeanLog sets the level: warn, or debug with -Dhybrid.debug=true. Same
+             version as the slf4j-api swing-kit brings. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.7</version>
+        </dependency>
         <!-- Oracle Forms client classes (VBean, IHandler, ...). Proprietary, so not in
              git: fetch it from the running server with
              curl -o forms-bean/lib/frmall.jar http://localhost:7777/forms/java/frmall.jar
