@@ -93,6 +93,15 @@ diagnostics to `~/hybrid-bean.log`.
   dialog to continue.") instead of the browser until they close. Reproduce with
   `HYBRID_FORMS_PARAMS='&otherparams=alert_test=YES' ./run-forms-client.sh`: an
   alert opens 12 seconds after start.
+- **Keyboard between Forms and the browser.** Clicking the browser gives it
+  the keyboard, but AWT's focus owner stays on the last Forms item, so keys the
+  page doesn't consume (arrows, Tab, Enter) also reached Forms: Down in the
+  Vaadin grid moved the Forms record. On macOS, Cmd+C/V/X/A/Z reach AWT, not
+  the browser, so they did nothing in Vaadin fields. `BrowserKeyboard` tracks
+  who has the keyboard by where the mouse is pressed (AWT reports presses on
+  the browser, but not always on the panel's own components), consumes Forms'
+  key events while the view has it, and sends the macOS edit shortcuts to the
+  browser's focused frame. A page load doesn't take the keyboard from Forms.
 - **Colours in the form XML.** Use names from Forms' default palette (`white`,
   `r25g25b50`…). Forms XML keeps only colour names, so a custom palette colour
   isn't recreated, and any unknown name renders black.

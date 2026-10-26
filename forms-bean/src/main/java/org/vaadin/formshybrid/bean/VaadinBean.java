@@ -83,6 +83,7 @@ public class VaadinBean extends VBean {
     private volatile String orderCustomerId = "";
     private volatile String ordersTotal = "";
     private AWTEventListener dialogWatcher;
+    private BrowserKeyboard keyboard;
 
     @Override
     public void init(IHandler handler) {
@@ -136,6 +137,7 @@ public class VaadinBean extends VBean {
             });
             pushCustomer();
             EventQueue.invokeLater(this::watchFormsDialogs);
+            EventQueue.invokeLater(() -> keyboard = BrowserKeyboard.install(p));
         } catch (Throwable t) {
             BeanLog.log("panel build failed", t);
             EventQueue.invokeLater(() -> status.setText("Vaadin view unavailable: " + t));
@@ -182,6 +184,9 @@ public class VaadinBean extends VBean {
         }
         if (covered == p.isVisible()) {
             BeanLog.log(covered ? "Forms dialog over the view: hiding the browser" : "Forms dialog closed: showing the browser");
+            if (covered && keyboard != null) {
+                keyboard.formsTookFocus();
+            }
             status.setText("Answer the Forms dialog to continue.");
             cards.show(this, covered ? STATUS_CARD : VIEW_CARD);
             validate();
@@ -270,6 +275,9 @@ public class VaadinBean extends VBean {
     public void destroy() {
         if (dialogWatcher != null) {
             Toolkit.getDefaultToolkit().removeAWTEventListener(dialogWatcher);
+        }
+        if (keyboard != null) {
+            keyboard.uninstall();
         }
         calls.shutdownNow();
         super.destroy();
