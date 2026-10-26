@@ -40,17 +40,22 @@ This repo contains no Oracle software. You need:
 - **Java 21 and Maven** on the host, and a **Vaadin subscription or trial**:
   swing-kit is a commercial Vaadin product (see Licence below).
 
-The launcher script uses macOS's `java_home`; on other systems, adapt
-`run-forms-client.sh`.
+The client launcher picks Java 21 with macOS's `java_home`, else `JAVA_HOME`,
+else `java` on the PATH. `run-forms-client.cmd` is the Windows version
+(untested).
 
 ## Run it
+
+**New machine?** Follow [docs/run-the-demo.md](docs/run-the-demo.md): every
+step from an empty x86_64 machine, with checks, timings and troubleshooting.
+The short version, once the Forms server is running:
 
 ```bash
 ./setup-db.sh               # create the HYBRID schema
 ./deploy-bean.sh            # build, self-sign and deploy hybrid-bean.jar
 ./deploy-form.sh            # build the form, register the [hybrid] config
 (cd hello-view && mvn spring-boot:run)   # the embedded view, in its own terminal
-./run-forms-client.sh       # the Forms client on Java 21
+./run-forms-client.sh       # the Forms client on Java 21 (Windows: run-forms-client.cmd)
 ```
 
 The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`. The bean writes
