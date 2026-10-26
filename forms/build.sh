@@ -56,11 +56,11 @@ grep -q "^$ALIAS" "$FMW/tnsnames.ora" 2>/dev/null || printf '\n%s\n' "$TNS_ENTRY
 sed "s#^FORMS_PATH=.*#&:$SRC#" "$APP/default.env" > "$APP/hybrid.env"
 echo "NLS_LANG=AMERICAN_AMERICA.AL32UTF8" >> "$APP/hybrid.env"
 
-# 5) [hybrid] config section. baseSAAfile is required by the standalone
-#    launcher (FRM-93136 without it); archive= lists the bean jar.
-if ! grep -q '^\[hybrid\]' "$APP/formsweb.cfg"; then
-  cat >> "$APP/formsweb.cfg" <<EOF
-
+# 5) [hybrid] config section, rewritten on every run so it matches this
+#    script. baseSAAfile is required by the standalone launcher (FRM-93136
+#    without it); archive= lists the bean jar; width/height size the window.
+awk '/^\[hybrid\]/{skip=1; next} /^\[/{skip=0} !skip' "$APP/formsweb.cfg" > "$APP/formsweb.cfg.tmp"
+cat >> "$APP/formsweb.cfg.tmp" <<EOF
 [hybrid]
 form=hybrid_demo.fmx
 userid=$CONN
@@ -72,8 +72,8 @@ archive=frmall.jar,hybrid-bean.jar
 lookAndFeel=Oracle
 separateFrame=true
 pageTitle=Forms and Vaadin hybrid demo
-width=900
-height=680
+width=1010
+height=930
 EOF
-  echo "cfg: added [hybrid] to formsweb.cfg"
-fi
+mv "$APP/formsweb.cfg.tmp" "$APP/formsweb.cfg"
+echo "cfg: wrote [hybrid] in formsweb.cfg"

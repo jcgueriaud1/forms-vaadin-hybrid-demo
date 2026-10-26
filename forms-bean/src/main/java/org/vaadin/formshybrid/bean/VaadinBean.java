@@ -33,6 +33,9 @@ import org.vaadin.formshybrid.contract.HybridEvents;
  * <li>Vaadin → Forms: the view's {@code greet} event raises the custom item event
  * {@code GREET}; the trigger reads the text with
  * {@code GET_CUSTOM_PROPERTY(bean, 1, 'GREET_MSG')}.</li>
+ * <li>Vaadin → Forms: the view's {@code orderSaved} event raises
+ * {@code ORDER_SAVED}; the trigger reads {@code ORDER_CUSTOMER_ID} and
+ * {@code ORDERS_TOTAL}.</li>
  * </ul>
  *
  * The view URL defaults to {@value #DEFAULT_URL} and can be overridden with the
@@ -43,6 +46,9 @@ public class VaadinBean extends VBean {
     private static final ID CUSTOMER = ID.registerProperty("CUSTOMER");
     private static final ID GREET = ID.registerProperty("GREET");
     private static final ID GREET_MSG = ID.registerProperty("GREET_MSG");
+    private static final ID ORDER_SAVED = ID.registerProperty("ORDER_SAVED");
+    private static final ID ORDER_CUSTOMER_ID = ID.registerProperty("ORDER_CUSTOMER_ID");
+    private static final ID ORDERS_TOTAL = ID.registerProperty("ORDERS_TOTAL");
 
     static final String DEFAULT_URL = "http://localhost:8080/";
     private static final int START_DELAY_MS = 1500;
@@ -62,6 +68,8 @@ public class VaadinBean extends VBean {
     private volatile boolean viewReady;
     private volatile String[] currentCustomer;
     private volatile String greeting = "";
+    private volatile String orderCustomerId = "";
+    private volatile String ordersTotal = "";
 
     @Override
     public void init(IHandler handler) {
@@ -99,6 +107,7 @@ public class VaadinBean extends VBean {
             JVaadinPanel p = SwingVaadinClient.getBuilder().build(url);
             p.addEventListener(HybridEvents.READY, e -> onViewReady());
             p.addEventListener(HybridEvents.GREET, this::onGreet);
+            p.addEventListener(HybridEvents.ORDER_SAVED, this::onOrderSaved);
             panel = p;
             BeanLog.log("panel built, isReady=" + p.isReady());
             EventQueue.invokeLater(() -> {
@@ -130,6 +139,12 @@ public class VaadinBean extends VBean {
     public Object getProperty(ID id) {
         if (id == GREET_MSG) {
             return greeting;
+        }
+        if (id == ORDER_CUSTOMER_ID) {
+            return orderCustomerId;
+        }
+        if (id == ORDERS_TOTAL) {
+            return ordersTotal;
         }
         return super.getProperty(id);
     }
@@ -167,6 +182,13 @@ public class VaadinBean extends VBean {
         Serializable message = event.getParams().get(HybridEvents.MESSAGE);
         greeting = message == null ? "" : message.toString();
         EventQueue.invokeLater(() -> dispatchCustomEvent(new CustomEvent(handler, GREET)));
+    }
+
+    private void onOrderSaved(VaadinSwingEvent event) {
+        BeanLog.log("orderSaved event " + event.getParams());
+        orderCustomerId = String.valueOf(event.getParams().get(HybridEvents.CUSTOMER_ID));
+        ordersTotal = String.valueOf(event.getParams().get(HybridEvents.TOTAL));
+        EventQueue.invokeLater(() -> dispatchCustomEvent(new CustomEvent(handler, ORDER_SAVED)));
     }
 
     @Override

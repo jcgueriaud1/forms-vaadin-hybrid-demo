@@ -5,11 +5,15 @@ both ways. Forms stays the shell while screens move to Vaadin one at a time:
 the shape of an incremental migration.
 
 - **Forms → Vaadin:** moving to a customer row in the Forms list pushes
-  `<id>|<name>` to the view. The view loads that customer from the **same
-  Oracle schema** through its own connection, and shows "Hello, <name> (#<id>)"
-  with the city and country.
-- **Vaadin → Forms:** the view's "Ask Forms to say hi" button sends a `greet`
-  event, and the Forms status bar shows the message.
+  `<id>|<name>` to the view. The view loads that customer and their **orders**
+  from the **same Oracle schema** through its own connection, and shows them in
+  a Vaadin Grid.
+- **Editing in Vaadin:** double-clicking an order opens a Vaadin Dialog (Date
+  Picker, Combo Box, Integer Field, Select). Saving commits the change, then the
+  view sends an `orderSaved` event, and the Forms list updates that customer's
+  **Orders total** column in place.
+- **Vaadin → Forms, simplest case:** the view's "Ask Forms to say hi" button
+  sends a `greet` event, and the Forms status bar shows the message.
 
 The bridge is a Forms Pluggable Java Component (a `VBean` in a bean area) that
 wraps Vaadin swing-kit's `JVaadinPanel`, an embedded Chromium (JCEF) showing
@@ -21,7 +25,7 @@ writer per screen, and the writer tells the other side after it commits. See
 ## Layout
 
 ```
-db/           schema.sql: HYBRID user + CUSTOMERS table (fictional data)
+db/           schema.sql: HYBRID user, CUSTOMERS, PRODUCTS, ORDERS and the ORDER_TOTALS view (fictional data)
 forms/        hybrid_demo_fmb.xml: the host form (source of truth), build.sh: builds it in the Forms container
 contract/     the interface and event names shared by both sides
 forms-bean/   the VBean → hybrid-bean.jar (Java 8 bytecode, self-signed)

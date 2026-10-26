@@ -6,17 +6,24 @@
 
   Forms → Vaadin: moving to a customer row sets the bean's CUSTOMER property to
   "<id>|<name>" (WHEN-NEW-RECORD-INSTANCE on CUSTOMERS).
-  Vaadin → Forms: the view's greet event raises the bean's GREET custom item
-  event; WHEN-CUSTOM-ITEM-EVENT reads GREET_MSG and shows it in the status bar.
+  Vaadin → Forms: WHEN-CUSTOM-ITEM-EVENT on the bean handles
+  - GREET: shows GREET_MSG in the status bar;
+  - ORDER_SAVED: the view committed an order change (it owns ORDERS, ADR-0003);
+    the form sets that customer's ORDERS_TOTAL from the event and resets the
+    record status, so Forms doesn't ask to save.
+  ORDERS_TOTAL is computed in POST-QUERY from the ORDER_TOTALS view, the same
+  definition the Vaadin view uses.
 -->
 <Module version="122010400" xmlns="http://xmlns.oracle.com/Forms">
    <FormModule Name="HYBRID_DEMO" Title="Forms and Vaadin hybrid demo" ConsoleWindow="MAIN">
       <Coordinate CharacterCellWidth="5" RealUnit="Point" DefaultFontScaling="true" CharacterCellHeight="14" CoordinateSystem="Real"/>
-      <Block Name="CUSTOMERS" QueryDataSourceName="CUSTOMERS" OrderByClause="NAME" RecordsDisplayCount="8" InsertAllowed="false" UpdateAllowed="false" DeleteAllowed="false" RecordVisualAttributeGroupName="CURRENT_RECORD" ShowScrollbar="true" ScrollbarCanvasName="MAIN" ScrollbarXPosition="512" ScrollbarYPosition="40" ScrollbarWidth="12" ScrollbarLength="112">
+      <Block Name="CUSTOMERS" QueryDataSourceName="CUSTOMERS" OrderByClause="NAME" RecordsDisplayCount="6" InsertAllowed="false" UpdateAllowed="false" DeleteAllowed="false" RecordVisualAttributeGroupName="CURRENT_RECORD" ShowScrollbar="true" ScrollbarCanvasName="MAIN" ScrollbarXPosition="512" ScrollbarYPosition="40" ScrollbarWidth="12" ScrollbarLength="84">
          <Item Name="ID" ItemType="Text Item" DataType="Number" MaximumLength="6" ColumnName="ID" CanvasName="MAIN" XPosition="16" YPosition="40" Width="44" Height="14" BackColor="white" Prompt="Id" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
-         <Item Name="NAME" ItemType="Text Item" DataType="Char" MaximumLength="60" ColumnName="NAME" CanvasName="MAIN" XPosition="60" YPosition="40" Width="196" Height="14" BackColor="white" Prompt="Customer" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
-         <Item Name="CITY" ItemType="Text Item" DataType="Char" MaximumLength="40" ColumnName="CITY" CanvasName="MAIN" XPosition="256" YPosition="40" Width="128" Height="14" BackColor="white" Prompt="City" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
-         <Item Name="COUNTRY" ItemType="Text Item" DataType="Char" MaximumLength="40" ColumnName="COUNTRY" CanvasName="MAIN" XPosition="384" YPosition="40" Width="128" Height="14" BackColor="white" Prompt="Country" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Item Name="NAME" ItemType="Text Item" DataType="Char" MaximumLength="60" ColumnName="NAME" CanvasName="MAIN" XPosition="60" YPosition="40" Width="176" Height="14" BackColor="white" Prompt="Customer" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Item Name="CITY" ItemType="Text Item" DataType="Char" MaximumLength="40" ColumnName="CITY" CanvasName="MAIN" XPosition="236" YPosition="40" Width="104" Height="14" BackColor="white" Prompt="City" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Item Name="COUNTRY" ItemType="Text Item" DataType="Char" MaximumLength="40" ColumnName="COUNTRY" CanvasName="MAIN" XPosition="340" YPosition="40" Width="100" Height="14" BackColor="white" Prompt="Country" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Item Name="ORDERS_TOTAL" ItemType="Text Item" DataType="Number" DatabaseItem="false" QueryAllowed="false" MaximumLength="12" FormatMask="999,990.00" Justification="Right" CanvasName="MAIN" XPosition="440" YPosition="40" Width="72" Height="14" BackColor="white" Prompt="Orders total" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Trigger Name="POST-QUERY" TriggerText="SELECT NVL(MAX(total), 0) INTO :customers.orders_total&amp;#10;FROM order_totals WHERE customer_id = :customers.id;"/>
          <Trigger Name="WHEN-NEW-RECORD-INSTANCE" TriggerText="SET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'CUSTOMER', :customers.id || '|' || :customers.name);"/>
          <DataSourceColumn DSCName="ID" DSCType="NUMBER" DSCLength="0" DSCPrecision="6" DSCScale="0" DSCMandatory="true" DSCNochildren="false" Type="Query"/>
          <DataSourceColumn DSCName="NAME" DSCType="VARCHAR2" DSCLength="60" DSCPrecision="0" DSCScale="0" DSCMandatory="true" DSCNochildren="false" Type="Query"/>
@@ -24,17 +31,17 @@
          <DataSourceColumn DSCName="COUNTRY" DSCType="VARCHAR2" DSCLength="40" DSCPrecision="0" DSCScale="0" DSCMandatory="false" DSCNochildren="false" Type="Query"/>
       </Block>
       <Block Name="CONTROL" DatabaseBlock="false">
-         <Item Name="VAADIN_VIEW" ItemType="Bean Area" ImplementationClass="org.vaadin.formshybrid.bean.VaadinBean" CanvasName="MAIN" XPosition="16" YPosition="176" Width="520" Height="260" KeyboardNavigable="false" MouseNavigate="false">
-            <Trigger Name="WHEN-CUSTOM-ITEM-EVENT" TriggerText="IF :SYSTEM.CUSTOM_ITEM_EVENT = 'GREET' THEN&amp;#10;  MESSAGE(GET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'GREET_MSG'));&amp;#10;END IF;"/>
+         <Item Name="VAADIN_VIEW" ItemType="Bean Area" ImplementationClass="org.vaadin.formshybrid.bean.VaadinBean" CanvasName="MAIN" XPosition="16" YPosition="150" Width="520" Height="270" KeyboardNavigable="false" MouseNavigate="false">
+            <Trigger Name="WHEN-CUSTOM-ITEM-EVENT" TriggerText="IF :SYSTEM.CUSTOM_ITEM_EVENT = 'GREET' THEN&amp;#10;  MESSAGE(GET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'GREET_MSG'));&amp;#10;ELSIF :SYSTEM.CUSTOM_ITEM_EVENT = 'ORDER_SAVED' THEN&amp;#10;  -- For the current customer: the view only shows that customer's orders.&amp;#10;  IF :customers.id = TO_NUMBER(GET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'ORDER_CUSTOMER_ID')) THEN&amp;#10;    :customers.orders_total := TO_NUMBER(GET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'ORDERS_TOTAL'), '999999990D00', 'NLS_NUMERIC_CHARACTERS=''.,''');&amp;#10;    SET_RECORD_PROPERTY(GET_BLOCK_PROPERTY('CUSTOMERS', CURRENT_RECORD), 'CUSTOMERS', STATUS, QUERY_STATUS);&amp;#10;    MESSAGE('Order saved in Vaadin: orders total updated.');&amp;#10;  END IF;&amp;#10;END IF;"/>
          </Item>
       </Block>
-      <Canvas Name="MAIN" WindowName="MAIN" Width="552" Height="452" ViewportWidth="552" ViewportHeight="452">
+      <Canvas Name="MAIN" WindowName="MAIN" Width="552" Height="430" ViewportWidth="552" ViewportHeight="430">
          <Graphics Name="LIST_TITLE" GraphicsType="Text" XPosition="16" YPosition="8" Width="300" Height="16" FillPattern="transparent" EdgePattern="none" HorizontalJustification="Start">
             <CompoundText Name="LIST_TITLE_TXT">
                <TextSegment Name="LIST_TITLE_SEG" FontName="Dialog" FontSize="1000" FontStyle="Plain" FontWeight="Bold" ForegroundColor="black" Text="Customers (Oracle Forms)"/>
             </CompoundText>
          </Graphics>
-         <Graphics Name="VIEW_TITLE" GraphicsType="Text" XPosition="16" YPosition="158" Width="300" Height="16" FillPattern="transparent" EdgePattern="none" HorizontalJustification="Start">
+         <Graphics Name="VIEW_TITLE" GraphicsType="Text" XPosition="16" YPosition="132" Width="300" Height="16" FillPattern="transparent" EdgePattern="none" HorizontalJustification="Start">
             <CompoundText Name="VIEW_TITLE_TXT">
                <TextSegment Name="VIEW_TITLE_SEG" FontName="Dialog" FontSize="1000" FontStyle="Plain" FontWeight="Bold" ForegroundColor="black" Text="Embedded Vaadin view"/>
             </CompoundText>
@@ -42,6 +49,6 @@
       </Canvas>
       <Trigger Name="WHEN-NEW-FORM-INSTANCE" TriggerText="SET_WINDOW_PROPERTY(FORMS_MDI_WINDOW, TITLE, 'Forms and Vaadin hybrid demo');&amp;#10;GO_BLOCK('CUSTOMERS');&amp;#10;EXECUTE_QUERY;"/>
       <VisualAttribute Name="CURRENT_RECORD" BackColor="r25g25b50" ForegroundColor="white"/>
-      <Window Name="MAIN" Title="Customers" Width="552" Height="452"/>
+      <Window Name="MAIN" Title="Customers" Width="552" Height="430"/>
    </FormModule>
 </Module>

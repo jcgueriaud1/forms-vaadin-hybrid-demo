@@ -137,12 +137,19 @@ run-forms-client.cmd           # Windows (untested)
 The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`.
 
 **Check:** a window "Forms and Vaadin hybrid demo" opens with the customer list
-on top and, below it, "Hello, Blue Fjord Outfitters (#103)" and "Bergen,
-Norway (read by Vaadin from Oracle)".
+on top and, below it, "Hello, Blue Fjord Outfitters (#103)", "Bergen, Norway
+· 3 orders, total 1,053.00 (read by Vaadin from Oracle)" and a grid with three
+orders.
 
 ## 7. Try it
 
-- Click another customer: the Vaadin view greets it.
+- Click another customer: the Vaadin view shows its orders.
+- Double-click an order, change the quantity (or the date, product or status)
+  and click **Save**. The grid updates, and in the Forms list the customer's
+  **Orders total** changes to the new value, with "Order saved in Vaadin: orders
+  total updated." in the status bar.
+- Outside Forms, the same view works in a normal browser at
+  http://localhost:8080/?customer=103 (without the Forms update).
 - Click **Ask Forms to say hi**: the Forms status bar at the bottom shows
   "Hi from Vaadin, <name>!".
 
