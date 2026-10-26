@@ -14,6 +14,9 @@ the shape of an incremental migration.
 The bridge is a Forms Pluggable Java Component (a `VBean` in a bean area) that
 wraps Vaadin swing-kit's `JVaadinPanel`, an embedded Chromium (JCEF) showing
 the Vaadin app. See [ADR-0001](docs/adr/0001-forms-hosts-vaadin-via-swing-kit-bean.md).
+Both sides use the same database through separate sessions: each table has one
+writer per screen, and the writer tells the other side after it commits. See
+[ADR-0003](docs/adr/0003-one-writer-per-table-events-for-refresh.md).
 
 ## Layout
 
