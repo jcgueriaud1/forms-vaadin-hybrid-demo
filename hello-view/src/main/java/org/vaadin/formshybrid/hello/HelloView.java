@@ -15,23 +15,26 @@ import org.vaadin.formshybrid.contract.HelloCallable;
 import org.vaadin.formshybrid.contract.HybridEvents;
 
 /**
- * The embedded view: greets the customer the host form is on, and can ask the
- * host form to show a message.
+ * The embedded view: greets the customer the host form is on, reading its
+ * details from the same database, and can ask the host form to show a message.
  */
 // @Bridge makes swing-kit add the <swing-bridge> element that receives Swing → Vaadin calls.
 @Bridge
 @Route("")
 public class HelloView extends VerticalLayout implements HelloCallable {
 
+    private final CustomerRepository customers;
     private final H2 greeting = new H2("Waiting for the host form…");
+    private final Paragraph details = new Paragraph();
     private final Button greet = new Button("Ask Forms to say hi");
     private String customerName;
 
-    public HelloView() {
+    public HelloView(CustomerRepository customers) {
+        this.customers = customers;
         greet.setEnabled(false);
         greet.addClickListener(e -> emit(HybridEvents.GREET,
                 "Hi from Vaadin, " + customerName + "!"));
-        add(greeting, greet);
+        add(greeting, details, greet);
     }
 
     @Override
@@ -45,8 +48,14 @@ public class HelloView extends VerticalLayout implements HelloCallable {
 
     @Override
     public void showCustomer(String id, String name) {
-        customerName = name;
-        greeting.setText("Hello, " + name + " (#" + id + ")");
+        // Forms sends the id and name; the rest comes from the shared database.
+        Customer customer = customers.findById(Long.parseLong(id))
+                .orElse(new Customer(Long.parseLong(id), name, null, null));
+        customerName = customer.name();
+        greeting.setText("Hello, " + customer.name() + " (#" + customer.id() + ")");
+        details.setText(customer.city() == null
+                ? "Not found in the database."
+                : customer.city() + ", " + customer.country() + " (read by Vaadin from Oracle)");
         greet.setEnabled(true);
     }
 

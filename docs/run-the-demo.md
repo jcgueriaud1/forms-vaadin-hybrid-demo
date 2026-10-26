@@ -119,6 +119,11 @@ cd hello-view
 mvn spring-boot:run
 ```
 
+The view connects to the demo schema at `localhost:1521/XEPDB1` as
+`hybrid`/`hybrid` (the database port is published by forms-docker-environment).
+For another database, set `HYBRID_JDBC_URL`, `HYBRID_DB_USER` and
+`HYBRID_DB_PASSWORD`.
+
 **Check:** http://localhost:8080 in a normal browser shows "Waiting for the
 host form…" and "Open this view inside the Forms host form to talk to it."
 
@@ -132,7 +137,8 @@ run-forms-client.cmd           # Windows (untested)
 The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`.
 
 **Check:** a window "Forms and Vaadin hybrid demo" opens with the customer list
-on top and, below it, "Hello, Blue Fjord Outfitters (#103)".
+on top and, below it, "Hello, Blue Fjord Outfitters (#103)" and "Bergen,
+Norway (read by Vaadin from Oracle)".
 
 ## 7. Try it
 
@@ -161,6 +167,7 @@ on top and, below it, "Hello, Blue Fjord Outfitters (#103)".
 | `IllegalAccessError … sun.awt` | The JVM lacks the `--add-opens` flags | Start through `run-forms-client.sh` / `.cmd`, not plain `java -jar` |
 | The bean area shows a browser error page | The Vaadin view isn't running | Start step 5, then restart the client |
 | A Vaadin licence screen inside the Forms window | No Vaadin licence key | Step 4 |
+| The view shows "Not found in the database." or the greeting never appears; the view's log shows `HikariPool` or `ORA-` errors | The view can't reach the demo schema | Check port 1521 is published and `setup-db.sh` ran; set `HYBRID_JDBC_URL` if your database differs |
 | Clicking customers changes nothing in the view | The view isn't connected, or calls are blocked | Look at `~/hybrid-bean.log` |
 | Accented names show without accents | Missing `NLS_LANG` | Re-run `./deploy-form.sh` |
 

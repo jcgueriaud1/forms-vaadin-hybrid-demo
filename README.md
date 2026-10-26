@@ -5,7 +5,9 @@ both ways. Forms stays the shell while screens move to Vaadin one at a time:
 the shape of an incremental migration.
 
 - **Forms → Vaadin:** moving to a customer row in the Forms list pushes
-  `<id>|<name>` to the view, which says "Hello, <name> (#<id>)".
+  `<id>|<name>` to the view. The view loads that customer from the **same
+  Oracle schema** through its own connection, and shows "Hello, <name> (#<id>)"
+  with the city and country.
 - **Vaadin → Forms:** the view's "Ask Forms to say hi" button sends a `greet`
   event, and the Forms status bar shows the message.
 
@@ -20,7 +22,7 @@ db/           schema.sql: HYBRID user + CUSTOMERS table (fictional data)
 forms/        hybrid_demo_fmb.xml: the host form (source of truth), build.sh: builds it in the Forms container
 contract/     the interface and event names shared by both sides
 forms-bean/   the VBean → hybrid-bean.jar (Java 8 bytecode, self-signed)
-hello-view/   the embedded Vaadin 25 view (Spring Boot, localhost:8080)
+hello-view/   the embedded Vaadin 25 view (Spring Boot, localhost:8080, JDBC to the same schema)
 ```
 
 ## Prerequisites
@@ -96,6 +98,10 @@ diagnostics to `~/hybrid-bean.log`.
 ## Licence
 
 The code in this repository is under the [Apache License 2.0](LICENSE).
+
+The Vaadin view uses Oracle's JDBC driver (`ojdbc17`), downloaded from Maven
+Central at build time under the
+[Oracle Free Use Terms and Conditions](https://www.oracle.com/downloads/licenses/oracle-free-license.html).
 
 It uses **Vaadin swing-kit**, a commercial product under the
 [Vaadin Commercial License and Service Terms](https://vaadin.com/commercial-license-and-service-terms).
