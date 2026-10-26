@@ -13,10 +13,16 @@
     record status, so Forms doesn't ask to save.
   ORDERS_TOTAL is computed in POST-QUERY from the ORDER_TOTALS view, the same
   definition the Vaadin view uses.
+
+  Reproducer for Forms dialogs over the bean area (issue #6): started with the
+  parameter ALERT_TEST=YES (run-forms-client.sh with
+  HYBRID_FORMS_PARAMS='&otherparams=alert_test=YES'), the form shows
+  TEST_ALERT 12 seconds after it opens.
 -->
 <Module version="122010400" xmlns="http://xmlns.oracle.com/Forms">
    <FormModule Name="HYBRID_DEMO" Title="Forms and Vaadin hybrid demo" ConsoleWindow="MAIN">
       <Coordinate CharacterCellWidth="5" RealUnit="Point" DefaultFontScaling="true" CharacterCellHeight="14" CoordinateSystem="Real"/>
+      <Alert Name="TEST_ALERT" Title="Forms alert test" AlertMessage="If you can read this, Forms alerts are not hidden behind the embedded Vaadin view." AlertStyle="Note" Button1Label="OK" Button2Label=""/>
       <Block Name="CUSTOMERS" QueryDataSourceName="CUSTOMERS" OrderByClause="NAME" RecordsDisplayCount="6" InsertAllowed="false" UpdateAllowed="false" DeleteAllowed="false" RecordVisualAttributeGroupName="CURRENT_RECORD" ShowScrollbar="true" ScrollbarCanvasName="MAIN" ScrollbarXPosition="512" ScrollbarYPosition="40" ScrollbarWidth="12" ScrollbarLength="84">
          <Item Name="ID" ItemType="Text Item" DataType="Number" MaximumLength="6" ColumnName="ID" CanvasName="MAIN" XPosition="16" YPosition="40" Width="44" Height="14" BackColor="white" Prompt="Id" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
          <Item Name="NAME" ItemType="Text Item" DataType="Char" MaximumLength="60" ColumnName="NAME" CanvasName="MAIN" XPosition="60" YPosition="40" Width="176" Height="14" BackColor="white" Prompt="Customer" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
@@ -47,7 +53,9 @@
             </CompoundText>
          </Graphics>
       </Canvas>
-      <Trigger Name="WHEN-NEW-FORM-INSTANCE" TriggerText="SET_WINDOW_PROPERTY(FORMS_MDI_WINDOW, TITLE, 'Forms and Vaadin hybrid demo');&amp;#10;GO_BLOCK('CUSTOMERS');&amp;#10;EXECUTE_QUERY;"/>
+      <ModuleParameter Name="ALERT_TEST" ParameterDataType="Char" ParameterInitializeValue="NO"/>
+      <Trigger Name="WHEN-NEW-FORM-INSTANCE" TriggerText="SET_WINDOW_PROPERTY(FORMS_MDI_WINDOW, TITLE, 'Forms and Vaadin hybrid demo');&amp;#10;GO_BLOCK('CUSTOMERS');&amp;#10;EXECUTE_QUERY;&amp;#10;IF :PARAMETER.alert_test = 'YES' THEN&amp;#10;  DECLARE&amp;#10;    t TIMER;&amp;#10;  BEGIN&amp;#10;    t := CREATE_TIMER('ALERT_TEST', 12000, NO_REPEAT);&amp;#10;  END;&amp;#10;END IF;"/>
+      <Trigger Name="WHEN-TIMER-EXPIRED" TriggerText="DECLARE&amp;#10;  answer NUMBER;&amp;#10;BEGIN&amp;#10;  IF GET_APPLICATION_PROPERTY(TIMER_NAME) = 'ALERT_TEST' THEN&amp;#10;    answer := SHOW_ALERT('TEST_ALERT');&amp;#10;  END IF;&amp;#10;END;"/>
       <VisualAttribute Name="CURRENT_RECORD" BackColor="r25g25b50" ForegroundColor="white"/>
       <Window Name="MAIN" Title="Customers" Width="552" Height="430"/>
    </FormModule>

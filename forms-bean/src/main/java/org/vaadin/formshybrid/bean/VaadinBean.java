@@ -1,6 +1,13 @@
 package org.vaadin.formshybrid.bean;
 
-import java.awt.BorderLayout;
+import java.awt.AWTEvent;
+import java.awt.CardLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.event.AWTEventListener;
 import java.awt.EventQueue;
 import java.awt.event.HierarchyEvent;
 import java.io.Serializable;
@@ -18,6 +25,7 @@ import com.vaadin.swingkit.core.VaadinSwingEvent;
 import oracle.forms.handler.IHandler;
 import oracle.forms.properties.ID;
 import oracle.forms.ui.CustomEvent;
+import oracle.forms.ui.FWindow;
 import oracle.forms.ui.VBean;
 
 import org.vaadin.formshybrid.contract.HelloCallable;
@@ -53,6 +61,10 @@ public class VaadinBean extends VBean {
     static final String DEFAULT_URL = "http://localhost:8080/";
     private static final int START_DELAY_MS = 1500;
 
+    private static final String STATUS_CARD = "status";
+    private static final String VIEW_CARD = "view";
+
+    private final CardLayout cards = new CardLayout();
     private final JLabel status = new JLabel("Starting the Vaadin view…", SwingConstants.CENTER);
     // Calls into the view block until the browser answers, so keep them off the
     // Forms (AWT) thread, in order.
@@ -70,6 +82,7 @@ public class VaadinBean extends VBean {
     private volatile String greeting = "";
     private volatile String orderCustomerId = "";
     private volatile String ordersTotal = "";
+    private AWTEventListener dialogWatcher;
 
     @Override
     public void init(IHandler handler) {
@@ -77,8 +90,13 @@ public class VaadinBean extends VBean {
         this.handler = handler;
         BeanLog.captureUncaughtExceptions();
         BeanLog.log("init");
-        setLayout(new BorderLayout());
-        add(status, BorderLayout.CENTER);
+        // Cards switch by visibility only: the browser is never removed, which
+        // would destroy its native window.
+        setLayout(cards);
+        status.setOpaque(true);
+        status.setBackground(Color.WHITE);
+        status.setForeground(Color.DARK_GRAY);
+        add(status, STATUS_CARD);
         // On macOS, CefApp initialisation runs on the AWT thread and synchronously
         // needs the AppKit thread. If the Forms window is still being shown or
         // resized, AppKit is waiting on the AWT thread at the same time and the
@@ -111,16 +129,73 @@ public class VaadinBean extends VBean {
             panel = p;
             BeanLog.log("panel built, isReady=" + p.isReady());
             EventQueue.invokeLater(() -> {
-                remove(status);
-                add(p, BorderLayout.CENTER);
+                add(p, VIEW_CARD);
+                cards.show(this, VIEW_CARD);
                 validate();
                 repaint();
             });
             pushCustomer();
+            EventQueue.invokeLater(this::watchFormsDialogs);
         } catch (Throwable t) {
             BeanLog.log("panel build failed", t);
             EventQueue.invokeLater(() -> status.setText("Vaadin view unavailable: " + t));
         }
+    }
+
+    /**
+     * Forms draws its alerts, LOVs and message boxes as lightweight windows
+     * ({@link FWindow}) in the same desktop container as the form's own window.
+     * The browser is a native component that always paints on top of them, so a
+     * dialog over the bean area would be hidden while Forms waits for an answer.
+     * While another visible Forms window overlaps the bean, the browser is
+     * replaced by a placeholder (issue #6).
+     */
+    private void watchFormsDialogs() {
+        FWindow own = ancestor(this, FWindow.class);
+        Container desktop = own == null ? null : own.getParent();
+        if (desktop == null) {
+            BeanLog.log("no Forms window found: dialogs won't be watched");
+            return;
+        }
+        dialogWatcher = e -> {
+            Object source = e.getSource();
+            if (source == desktop || source instanceof FWindow) {
+                updateForDialogs(own, desktop);
+            }
+        };
+        Toolkit.getDefaultToolkit().addAWTEventListener(dialogWatcher,
+                AWTEvent.CONTAINER_EVENT_MASK | AWTEvent.COMPONENT_EVENT_MASK);
+    }
+
+    private void updateForDialogs(FWindow own, Container desktop) {
+        JVaadinPanel p = panel;
+        if (p == null || !isShowing()) {
+            return;
+        }
+        Rectangle bean = javax.swing.SwingUtilities.convertRectangle(getParent(), getBounds(), desktop);
+        boolean covered = false;
+        for (Component c : desktop.getComponents()) {
+            if (c != own && c instanceof FWindow && c.isVisible() && c.getBounds().intersects(bean)) {
+                covered = true;
+                break;
+            }
+        }
+        if (covered == p.isVisible()) {
+            BeanLog.log(covered ? "Forms dialog over the view: hiding the browser" : "Forms dialog closed: showing the browser");
+            status.setText("Answer the Forms dialog to continue.");
+            cards.show(this, covered ? STATUS_CARD : VIEW_CARD);
+            validate();
+            desktop.repaint();
+        }
+    }
+
+    private static <T> T ancestor(Component c, Class<T> type) {
+        for (Component p = c; p != null; p = p.getParent()) {
+            if (type.isInstance(p)) {
+                return type.cast(p);
+            }
+        }
+        return null;
     }
 
     @Override
@@ -193,6 +268,9 @@ public class VaadinBean extends VBean {
 
     @Override
     public void destroy() {
+        if (dialogWatcher != null) {
+            Toolkit.getDefaultToolkit().removeAWTEventListener(dialogWatcher);
+        }
         calls.shutdownNow();
         super.destroy();
     }

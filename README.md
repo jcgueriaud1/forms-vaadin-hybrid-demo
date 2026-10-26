@@ -85,6 +85,14 @@ diagnostics to `~/hybrid-bean.log`.
   (`run-forms-client.sh` sets them). It must also start only once the bean is
   on screen and the window has settled, or the AWT and AppKit threads deadlock
   and the client hangs on its splash screen. The bean waits for that.
+- **Forms dialogs and the native browser.** Forms draws alerts, LOVs and
+  message boxes as lightweight windows inside its own window, and the embedded
+  browser is a native component that paints over them. A dialog over the bean
+  area would be invisible while Forms waits for an answer. The bean watches for
+  other Forms windows over its area and shows a placeholder ("Answer the Forms
+  dialog to continue.") instead of the browser until they close. Reproduce with
+  `HYBRID_FORMS_PARAMS='&otherparams=alert_test=YES' ./run-forms-client.sh`: an
+  alert opens 12 seconds after start.
 - **Colours in the form XML.** Use names from Forms' default palette (`white`,
   `r25g25b50`…). Forms XML keeps only colour names, so a custom palette colour
   isn't recreated, and any unknown name renders black.

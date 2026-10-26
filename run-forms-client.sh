@@ -4,6 +4,7 @@
 #
 #   ./run-forms-client.sh [java-version]          default: 21
 #   JAVA_OPTS="-Dhybrid.url=..." ./run-forms-client.sh
+#   HYBRID_FORMS_PARAMS='&otherparams=alert_test=YES' ./run-forms-client.sh   (issue #6 reproducer)
 #
 # The JVM: on macOS the installed JDK of that version, else $JAVA_HOME if
 # set, else `java` on the PATH. FSAL runs the client with `java -jar frmsal.jar`, so
@@ -38,4 +39,4 @@ find "${TMPDIR:-/tmp}/frmsal" -name hybrid-bean.jar -delete 2>/dev/null || true
 curl -sf -o "$DIR/frmsal.jar" "$HYBRID_FORMS_URL/java/frmsal.jar"
 # shellcheck disable=SC2086  # both are lists of options
 exec "$JAVA" $ADD_OPENS ${JAVA_OPTS:-} -jar "$DIR/frmsal.jar" \
-  -url "$HYBRID_FORMS_URL/frmservlet?config=hybrid" -t 10000
+  -url "$HYBRID_FORMS_URL/frmservlet?config=hybrid${HYBRID_FORMS_PARAMS:-}" -t 10000
