@@ -27,16 +27,16 @@ hello-view/   the embedded Vaadin 25 view (Spring Boot, localhost:8080)
 
 This repo contains no Oracle software. You need:
 
-- **Oracle Forms 12.2.1.4** in a Docker container, downloaded from Oracle under
-  Oracle's licence terms. The scripts assume a container named `frfmw` with the
-  Forms domain at `/opt/oracle/user_projects/domains/FRDEMO`, served at
-  `http://localhost:7777/forms`. Override with `HYBRID_FORMS_CONTAINER`,
-  `HYBRID_FORMS_DOMAIN` and `HYBRID_FORMS_URL`.
-- **An Oracle database** the Forms container can reach. Oracle Database Free
-  works, for example `gvenzl/oracle-free` (`HYBRID_DB_SERVICE=FREEPDB1`). The
-  defaults are a `gvenzl/oracle-xe` container named `frdb`, service `XEPDB1`.
-  Override with `HYBRID_DB_CONTAINER`, `HYBRID_DB_HOST`, `HYBRID_DB_SERVICE` and
-  `HYBRID_DB_SYS_PASSWORD`.
+- **An x86_64 (Intel/AMD) machine.** Oracle Forms 12.2.1.4 has no ARM build.
+- **Oracle Forms 12.2.1.4 and an Oracle database in Docker.** Set them up with
+  [forms-docker-environment](https://github.com/jcgueriaud1/forms-docker-environment):
+  you build the Forms image from Oracle's installers (downloaded under Oracle's
+  licence terms), then `docker compose up -d`. Its defaults are exactly what
+  these scripts expect: containers `frfmw` and `frdb`, domain `FRDEMO`, Forms at
+  `http://localhost:7777/forms`, database service `XEPDB1`.
+  For another setup, override `HYBRID_FORMS_CONTAINER`, `HYBRID_FORMS_DOMAIN`,
+  `HYBRID_FORMS_URL`, `HYBRID_DB_CONTAINER`, `HYBRID_DB_HOST`,
+  `HYBRID_DB_SERVICE` and `HYBRID_DB_SYS_PASSWORD`.
 - **Java 21 and Maven** on the host, and a **Vaadin subscription or trial**:
   swing-kit is a commercial Vaadin product (see Licence below).
 
