@@ -31,6 +31,9 @@ fi
 "$JAVA" -version 2>&1 | head -1
 
 mkdir -p "$DIR"
+# FSAL caches archive jars by name and keeps using a cached hybrid-bean.jar
+# after it is redeployed, so drop the cached copy (frmall.jar stays cached).
+find "${TMPDIR:-/tmp}/frmsal" -name hybrid-bean.jar -delete 2>/dev/null || true
 # Always fetch frmsal.jar from the server, so it matches its Forms version.
 curl -sf -o "$DIR/frmsal.jar" "$HYBRID_FORMS_URL/java/frmsal.jar"
 # shellcheck disable=SC2086  # both are lists of options

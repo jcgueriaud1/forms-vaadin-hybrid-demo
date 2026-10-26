@@ -14,6 +14,9 @@ if not "%JAVA_HOME%"=="" set JAVA="%JAVA_HOME%\bin\java"
 set DIR=%TEMP%\fsal
 if not exist "%DIR%" mkdir "%DIR%"
 
+rem FSAL caches archive jars by name and keeps using a cached hybrid-bean.jar
+rem after it is redeployed, so drop the cached copy (frmall.jar stays cached).
+if exist "%TEMP%\frmsal" del /s /q "%TEMP%\frmsal\hybrid-bean.jar" >nul 2>&1
 rem Always fetch frmsal.jar from the server, so it matches its Forms version.
 curl -sf -o "%DIR%\frmsal.jar" "%HYBRID_FORMS_URL%/java/frmsal.jar" || (
   echo Cannot download frmsal.jar from %HYBRID_FORMS_URL% & exit /b 1

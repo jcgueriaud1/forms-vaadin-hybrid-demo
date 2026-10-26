@@ -176,6 +176,7 @@ orders.
 | A Vaadin licence screen inside the Forms window | No Vaadin licence key | Step 4 |
 | The view shows "Not found in the database." or the greeting never appears; the view's log shows `HikariPool` or `ORA-` errors | The view can't reach the demo schema | Check port 1521 is published and `setup-db.sh` ran; set `HYBRID_JDBC_URL` if your database differs |
 | Clicking customers changes nothing in the view | The view isn't connected, or calls are blocked | Look at `~/hybrid-bean.log` |
+| After redeploying the bean, Forms ignores new events (e.g. the Orders total doesn't update) | The standalone launcher keeps using its cached `hybrid-bean.jar` | Start the client with `run-forms-client.sh` / `.cmd`, which deletes that cached jar first |
 | Accented names show without accents | Missing `NLS_LANG` | Re-run `./deploy-form.sh` |
 
 ## Report back (acceptance test for #1)

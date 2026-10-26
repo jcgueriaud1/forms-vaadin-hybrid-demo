@@ -98,6 +98,9 @@ public class HelloView extends VerticalLayout implements HelloCallable, BeforeEn
 
     @Override
     public void showCustomer(String id, String name) {
+        if (id == null || id.isBlank()) {
+            return; // an empty Forms record: keep showing the last customer
+        }
         // Forms sends the id and name; the rest comes from the shared database.
         customer = customers.findById(Long.parseLong(id))
                 .orElse(new Customer(Long.parseLong(id), name, null, null));
