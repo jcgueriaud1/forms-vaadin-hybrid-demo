@@ -1,0 +1,47 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<!--
+  The host form: a customer list (Oracle Forms) above an embedded Vaadin view.
+  This XML is the source of truth; deploy-form.sh turns it into hybrid_demo.fmb
+  with frmxml2f and compiles it. Colours must be default-palette names.
+
+  Forms → Vaadin: moving to a customer row sets the bean's CUSTOMER property to
+  "<id>|<name>" (WHEN-NEW-RECORD-INSTANCE on CUSTOMERS).
+  Vaadin → Forms: the view's greet event raises the bean's GREET custom item
+  event; WHEN-CUSTOM-ITEM-EVENT reads GREET_MSG and shows it in the status bar.
+-->
+<Module version="122010400" xmlns="http://xmlns.oracle.com/Forms">
+   <FormModule Name="HYBRID_DEMO" Title="Forms and Vaadin hybrid demo" ConsoleWindow="MAIN">
+      <Coordinate CharacterCellWidth="5" RealUnit="Point" DefaultFontScaling="true" CharacterCellHeight="14" CoordinateSystem="Real"/>
+      <Block Name="CUSTOMERS" QueryDataSourceName="CUSTOMERS" OrderByClause="NAME" RecordsDisplayCount="8" InsertAllowed="false" UpdateAllowed="false" DeleteAllowed="false" RecordVisualAttributeGroupName="CURRENT_RECORD" ShowScrollbar="true" ScrollbarCanvasName="MAIN" ScrollbarXPosition="512" ScrollbarYPosition="40" ScrollbarWidth="12" ScrollbarLength="112">
+         <Item Name="ID" ItemType="Text Item" DataType="Number" MaximumLength="6" ColumnName="ID" CanvasName="MAIN" XPosition="16" YPosition="40" Width="44" Height="14" BackColor="white" Prompt="Id" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Item Name="NAME" ItemType="Text Item" DataType="Char" MaximumLength="60" ColumnName="NAME" CanvasName="MAIN" XPosition="60" YPosition="40" Width="196" Height="14" BackColor="white" Prompt="Customer" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Item Name="CITY" ItemType="Text Item" DataType="Char" MaximumLength="40" ColumnName="CITY" CanvasName="MAIN" XPosition="256" YPosition="40" Width="128" Height="14" BackColor="white" Prompt="City" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Item Name="COUNTRY" ItemType="Text Item" DataType="Char" MaximumLength="40" ColumnName="COUNTRY" CanvasName="MAIN" XPosition="384" YPosition="40" Width="128" Height="14" BackColor="white" Prompt="Country" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>
+         <Trigger Name="WHEN-NEW-RECORD-INSTANCE" TriggerText="SET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'CUSTOMER', :customers.id || '|' || :customers.name);"/>
+         <DataSourceColumn DSCName="ID" DSCType="NUMBER" DSCLength="0" DSCPrecision="6" DSCScale="0" DSCMandatory="true" DSCNochildren="false" Type="Query"/>
+         <DataSourceColumn DSCName="NAME" DSCType="VARCHAR2" DSCLength="60" DSCPrecision="0" DSCScale="0" DSCMandatory="true" DSCNochildren="false" Type="Query"/>
+         <DataSourceColumn DSCName="CITY" DSCType="VARCHAR2" DSCLength="40" DSCPrecision="0" DSCScale="0" DSCMandatory="false" DSCNochildren="false" Type="Query"/>
+         <DataSourceColumn DSCName="COUNTRY" DSCType="VARCHAR2" DSCLength="40" DSCPrecision="0" DSCScale="0" DSCMandatory="false" DSCNochildren="false" Type="Query"/>
+      </Block>
+      <Block Name="CONTROL" DatabaseBlock="false">
+         <Item Name="VAADIN_VIEW" ItemType="Bean Area" ImplementationClass="org.vaadin.formshybrid.bean.VaadinBean" CanvasName="MAIN" XPosition="16" YPosition="176" Width="520" Height="260" KeyboardNavigable="false" MouseNavigate="false">
+            <Trigger Name="WHEN-CUSTOM-ITEM-EVENT" TriggerText="IF :SYSTEM.CUSTOM_ITEM_EVENT = 'GREET' THEN&amp;#10;  MESSAGE(GET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'GREET_MSG'));&amp;#10;END IF;"/>
+         </Item>
+      </Block>
+      <Canvas Name="MAIN" WindowName="MAIN" Width="552" Height="452" ViewportWidth="552" ViewportHeight="452">
+         <Graphics Name="LIST_TITLE" GraphicsType="Text" XPosition="16" YPosition="8" Width="300" Height="16" FillPattern="transparent" EdgePattern="none" HorizontalJustification="Start">
+            <CompoundText Name="LIST_TITLE_TXT">
+               <TextSegment Name="LIST_TITLE_SEG" FontName="Dialog" FontSize="1000" FontStyle="Plain" FontWeight="Bold" ForegroundColor="black" Text="Customers (Oracle Forms)"/>
+            </CompoundText>
+         </Graphics>
+         <Graphics Name="VIEW_TITLE" GraphicsType="Text" XPosition="16" YPosition="158" Width="300" Height="16" FillPattern="transparent" EdgePattern="none" HorizontalJustification="Start">
+            <CompoundText Name="VIEW_TITLE_TXT">
+               <TextSegment Name="VIEW_TITLE_SEG" FontName="Dialog" FontSize="1000" FontStyle="Plain" FontWeight="Bold" ForegroundColor="black" Text="Embedded Vaadin view"/>
+            </CompoundText>
+         </Graphics>
+      </Canvas>
+      <Trigger Name="WHEN-NEW-FORM-INSTANCE" TriggerText="SET_WINDOW_PROPERTY(FORMS_MDI_WINDOW, TITLE, 'Forms and Vaadin hybrid demo');&amp;#10;GO_BLOCK('CUSTOMERS');&amp;#10;EXECUTE_QUERY;"/>
+      <VisualAttribute Name="CURRENT_RECORD" BackColor="r25g25b50" ForegroundColor="white"/>
+      <Window Name="MAIN" Title="Customers" Width="552" Height="452"/>
+   </FormModule>
+</Module>

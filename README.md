@@ -1,0 +1,102 @@
+# Forms ↔ Vaadin hybrid demo
+
+An Oracle Forms 12c screen that hosts a live Vaadin view, with calls flowing
+both ways. Forms stays the shell while screens move to Vaadin one at a time:
+the shape of an incremental migration.
+
+- **Forms → Vaadin:** moving to a customer row in the Forms list pushes
+  `<id>|<name>` to the view, which says "Hello, <name> (#<id>)".
+- **Vaadin → Forms:** the view's "Ask Forms to say hi" button sends a `greet`
+  event, and the Forms status bar shows the message.
+
+The bridge is a Forms Pluggable Java Component (a `VBean` in a bean area) that
+wraps Vaadin swing-kit's `JVaadinPanel`, an embedded Chromium (JCEF) showing
+the Vaadin app. See [ADR-0001](docs/adr/0001-forms-hosts-vaadin-via-swing-kit-bean.md).
+
+## Layout
+
+```
+db/           schema.sql: HYBRID user + CUSTOMERS table (fictional data)
+forms/        hybrid_demo_fmb.xml: the host form (source of truth), build.sh: builds it in the Forms container
+contract/     the interface and event names shared by both sides
+forms-bean/   the VBean → hybrid-bean.jar (Java 8 bytecode, self-signed)
+hello-view/   the embedded Vaadin 25 view (Spring Boot, localhost:8080)
+```
+
+## Prerequisites
+
+This repo contains no Oracle software. You need:
+
+- **Oracle Forms 12.2.1.4** in a Docker container, downloaded from Oracle under
+  Oracle's licence terms. The scripts assume a container named `frfmw` with the
+  Forms domain at `/opt/oracle/user_projects/domains/FRDEMO`, served at
+  `http://localhost:7777/forms`. Override with `HYBRID_FORMS_CONTAINER`,
+  `HYBRID_FORMS_DOMAIN` and `HYBRID_FORMS_URL`.
+- **An Oracle database** the Forms container can reach. Oracle Database Free
+  works, for example `gvenzl/oracle-free` (`HYBRID_DB_SERVICE=FREEPDB1`). The
+  defaults are a `gvenzl/oracle-xe` container named `frdb`, service `XEPDB1`.
+  Override with `HYBRID_DB_CONTAINER`, `HYBRID_DB_HOST`, `HYBRID_DB_SERVICE` and
+  `HYBRID_DB_SYS_PASSWORD`.
+- **Java 21 and Maven** on the host, and a **Vaadin subscription or trial**:
+  swing-kit is a commercial Vaadin product (see Licence below).
+
+The launcher script uses macOS's `java_home`; on other systems, adapt
+`run-forms-client.sh`.
+
+## Run it
+
+```bash
+./setup-db.sh               # create the HYBRID schema
+./deploy-bean.sh            # build, self-sign and deploy hybrid-bean.jar
+./deploy-form.sh            # build the form, register the [hybrid] config
+(cd hello-view && mvn spring-boot:run)   # the embedded view, in its own terminal
+./run-forms-client.sh       # the Forms client on Java 21
+```
+
+The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`. The bean writes
+diagnostics to `~/hybrid-bean.log`.
+
+## Gotchas
+
+- **`@Bridge` on the route.** swing-kit 3.x only adds the `<swing-bridge>`
+  element, which receives Swing → Vaadin calls, when the route class has
+  `@com.vaadin.swingkit.server.Bridge`. Without it, calls from Forms hang
+  silently until the 300 s timeout. Vaadin → Swing events still work, which
+  makes this hard to spot.
+- **The Forms client JVM.** OpenWebStart ignores the JNLP's Java version and
+  runs its bundled Java 8, so the demo uses Oracle's Forms Standalone Launcher
+  on Java 21. Each launched config needs `baseSAAfile=basesaa.txt` (FRM-93136
+  otherwise). See [ADR-0002](docs/adr/0002-forms-client-on-java-21.md).
+- **macOS.** JCEF on Java 17+ needs three `--add-opens` flags
+  (`run-forms-client.sh` sets them). It must also start only once the bean is
+  on screen and the window has settled, or the AWT and AppKit threads deadlock
+  and the client hangs on its splash screen. The bean waits for that.
+- **Colours in the form XML.** Use names from Forms' default palette (`white`,
+  `r25g25b50`…). Forms XML keeps only colour names, so a custom palette colour
+  isn't recreated, and any unknown name renders black.
+- **Compiler errors are silent.** `frmcmp` exits 1 with no output when it can't
+  log in, and rejects easy-connect strings, so `forms/build.sh` uses a tnsnames
+  alias.
+- **Character set.** Without `NLS_LANG` the Forms runtime uses US7ASCII, so
+  "Łódź" shows as "Lodz". `forms/build.sh` sets AL32UTF8.
+
+## Versions
+
+- swing-kit **3.0.1**: server `vaadin-swing-kit-flow` (Flow 25, Java 21), client
+  `vaadin-swing-kit-client` (Java 8 bytecode, JCEF via `me.friwi:jcefmaven`
+  135.0.20, Chromium 135)
+- Vaadin 25.2, Spring Boot 4.1
+- Oracle Forms 12.2.1.4 client on Java 21, through the standalone launcher
+
+## Licence
+
+The code in this repository is under the [Apache License 2.0](LICENSE).
+
+It uses **Vaadin swing-kit**, a commercial product under the
+[Vaadin Commercial License and Service Terms](https://vaadin.com/commercial-license-and-service-terms).
+Running the demo needs a Vaadin subscription or trial.
+
+Oracle, Java and Oracle Forms are trademarks of Oracle and/or its affiliates.
+This project is not affiliated with or endorsed by Oracle. No Oracle software
+is included: `deploy-bean.sh` downloads `frmall.jar` from your own Forms server
+at build time, and it is never committed or bundled into the bean jar.

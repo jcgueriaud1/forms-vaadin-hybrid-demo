@@ -1,0 +1,177 @@
+package org.vaadin.formshybrid.bean;
+
+import java.awt.BorderLayout;
+import java.awt.EventQueue;
+import java.awt.event.HierarchyEvent;
+import java.io.Serializable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.swing.JLabel;
+import javax.swing.SwingConstants;
+import javax.swing.Timer;
+
+import com.vaadin.swingkit.client.JVaadinPanel;
+import com.vaadin.swingkit.client.SwingVaadinClient;
+import com.vaadin.swingkit.core.VaadinSwingEvent;
+
+import oracle.forms.handler.IHandler;
+import oracle.forms.properties.ID;
+import oracle.forms.ui.CustomEvent;
+import oracle.forms.ui.VBean;
+
+import org.vaadin.formshybrid.contract.HelloCallable;
+import org.vaadin.formshybrid.contract.HybridEvents;
+
+/**
+ * Forms bean area implementation that shows the embedded Vaadin view through
+ * swing-kit's {@link JVaadinPanel}.
+ *
+ * <ul>
+ * <li>Forms → Vaadin: {@code SET_CUSTOM_PROPERTY(bean, 1, 'CUSTOMER', 'id|name')}
+ * calls {@link HelloCallable#showCustomer}.</li>
+ * <li>Vaadin → Forms: the view's {@code greet} event raises the custom item event
+ * {@code GREET}; the trigger reads the text with
+ * {@code GET_CUSTOM_PROPERTY(bean, 1, 'GREET_MSG')}.</li>
+ * </ul>
+ *
+ * The view URL defaults to {@value #DEFAULT_URL} and can be overridden with the
+ * {@code -Dhybrid.url=...} JVM option.
+ */
+public class VaadinBean extends VBean {
+
+    private static final ID CUSTOMER = ID.registerProperty("CUSTOMER");
+    private static final ID GREET = ID.registerProperty("GREET");
+    private static final ID GREET_MSG = ID.registerProperty("GREET_MSG");
+
+    static final String DEFAULT_URL = "http://localhost:8080/";
+    private static final int START_DELAY_MS = 1500;
+
+    private final JLabel status = new JLabel("Starting the Vaadin view…", SwingConstants.CENTER);
+    // Calls into the view block until the browser answers, so keep them off the
+    // Forms (AWT) thread, in order.
+    private final ExecutorService calls = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "hybrid-bean-calls");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private IHandler handler;
+    private boolean started;
+    private volatile JVaadinPanel panel;
+    private volatile boolean viewReady;
+    private volatile String[] currentCustomer;
+    private volatile String greeting = "";
+
+    @Override
+    public void init(IHandler handler) {
+        super.init(handler);
+        this.handler = handler;
+        BeanLog.captureUncaughtExceptions();
+        BeanLog.log("init");
+        setLayout(new BorderLayout());
+        add(status, BorderLayout.CENTER);
+        // On macOS, CefApp initialisation runs on the AWT thread and synchronously
+        // needs the AppKit thread. If the Forms window is still being shown or
+        // resized, AppKit is waiting on the AWT thread at the same time and the
+        // client deadlocks on its splash screen. So start JCEF only once the bean
+        // is on screen and the window has settled.
+        addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()
+                    && !started) {
+                started = true;
+                Timer settle = new Timer(START_DELAY_MS, ev -> {
+                    Thread starter = new Thread(this::startPanel, "hybrid-bean-start");
+                    starter.setDaemon(true);
+                    starter.start();
+                });
+                settle.setRepeats(false);
+                settle.start();
+            }
+        });
+    }
+
+    /** JCEF start-up is slow (and downloads Chromium on first run): never on the Forms thread. */
+    private void startPanel() {
+        String url = System.getProperty("hybrid.url", DEFAULT_URL);
+        try {
+            BeanLog.log("building panel for " + url);
+            JVaadinPanel p = SwingVaadinClient.getBuilder().build(url);
+            p.addEventListener(HybridEvents.READY, e -> onViewReady());
+            p.addEventListener(HybridEvents.GREET, this::onGreet);
+            panel = p;
+            BeanLog.log("panel built, isReady=" + p.isReady());
+            EventQueue.invokeLater(() -> {
+                remove(status);
+                add(p, BorderLayout.CENTER);
+                validate();
+                repaint();
+            });
+            pushCustomer();
+        } catch (Throwable t) {
+            BeanLog.log("panel build failed", t);
+            EventQueue.invokeLater(() -> status.setText("Vaadin view unavailable: " + t));
+        }
+    }
+
+    @Override
+    public boolean setProperty(ID id, Object value) {
+        BeanLog.log("setProperty " + id + " = " + value);
+        if (id == CUSTOMER) {
+            String[] parts = String.valueOf(value).split("\\|", 2);
+            currentCustomer = new String[] { parts[0], parts.length > 1 ? parts[1] : "" };
+            pushCustomer();
+            return true;
+        }
+        return super.setProperty(id, value);
+    }
+
+    @Override
+    public Object getProperty(ID id) {
+        if (id == GREET_MSG) {
+            return greeting;
+        }
+        return super.getProperty(id);
+    }
+
+    /** The form usually sends the first customer before the view has loaded: replay it on ready. */
+    private void onViewReady() {
+        BeanLog.log("view ready event");
+        viewReady = true;
+        pushCustomer();
+    }
+
+    private void pushCustomer() {
+        String[] customer = currentCustomer;
+        JVaadinPanel p = panel;
+        // The view's ready event can fire while build() is still loading the page,
+        // before our listener exists, so swing-kit's own load state counts too.
+        if (customer == null || p == null || !(viewReady || p.isReady())) {
+            BeanLog.log("pushCustomer deferred: customer=" + (customer != null) + " panel="
+                    + (p != null) + " viewReady=" + viewReady + " isReady=" + (p != null && p.isReady()));
+            return;
+        }
+        calls.submit(() -> {
+            try {
+                BeanLog.log("calling showCustomer(" + customer[0] + ", " + customer[1] + ")");
+                p.as(HelloCallable.class).showCustomer(customer[0], customer[1]);
+                BeanLog.log("showCustomer returned");
+            } catch (Throwable t) {
+                BeanLog.log("showCustomer failed", t);
+            }
+        });
+    }
+
+    private void onGreet(VaadinSwingEvent event) {
+        BeanLog.log("greet event " + event.getParams());
+        Serializable message = event.getParams().get(HybridEvents.MESSAGE);
+        greeting = message == null ? "" : message.toString();
+        EventQueue.invokeLater(() -> dispatchCustomEvent(new CustomEvent(handler, GREET)));
+    }
+
+    @Override
+    public void destroy() {
+        calls.shutdownNow();
+        super.destroy();
+    }
+}
