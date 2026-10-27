@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 410" width="1200" height="410" font-family="'NB International Pro', Inter, Arial, sans-serif">
+  <title>Incremental migration: Forms hosts Vaadin screens until it can be retired</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f0f0f"/>
+    </marker>
+    <style>
+      .step { font-family: 'NB International Pro Mono', 'Noto Sans Mono', Menlo, monospace; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; fill: #056ff0; }
+      .title { font-size: 21px; font-weight: 700; fill: #0f0f0f; }
+      .text { font-size: 15px; fill: #3f3f3f; }
+      .chrome { fill: #ffffff; stroke: #878787; stroke-width: 1.5; }
+      .forms { fill: #dbdbdb; }
+      .vaadin { fill: #056ff0; }
+      .w { font-size: 13px; fill: #ffffff; font-weight: 700; }
+      .g { font-size: 13px; fill: #575757; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="410" fill="#f0f4f7"/>
+
+  <!-- Step 1 -->
+  <text x="60" y="56" class="step">Step 1 · this demo</text>
+  <rect x="60" y="74" width="300" height="220" rx="8" class="chrome"/>
+  <rect x="60" y="74" width="300" height="26" rx="8" fill="#878787"/>
+  <rect x="60" y="88" width="300" height="12" fill="#878787"/>
+  <text x="74" y="92" class="w">Oracle Forms</text>
+  <rect x="78" y="116" width="264" height="74" rx="4" class="forms"/>
+  <text x="92" y="158" class="g">Forms block</text>
+  <rect x="78" y="202" width="264" height="74" rx="4" class="vaadin"/>
+  <text x="92" y="244" class="w">Vaadin view in a bean area</text>
+  <text x="60" y="328" class="title">Forms hosts Vaadin</text>
+  <text x="60" y="356" class="text">New and reworked screens are Vaadin,</text>
+  <text x="60" y="378" class="text">inside the Forms window users know.</text>
+
+  <line x1="380" y1="184" x2="436" y2="184" stroke="#0f0f0f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 2 -->
+  <text x="450" y="56" class="step">Step 2</text>
+  <rect x="450" y="74" width="300" height="220" rx="8" class="chrome"/>
+  <rect x="450" y="74" width="300" height="26" rx="8" fill="#878787"/>
+  <rect x="450" y="88" width="300" height="12" fill="#878787"/>
+  <text x="464" y="92" class="w">Oracle Forms</text>
+  <rect x="468" y="116" width="80" height="160" rx="4" class="forms"/>
+  <text x="508" y="200" class="g" text-anchor="middle">menu</text>
+  <rect x="560" y="116" width="172" height="74" rx="4" class="vaadin"/>
+  <rect x="560" y="202" width="82" height="74" rx="4" class="vaadin"/>
+  <rect x="650" y="202" width="82" height="74" rx="4" class="vaadin"/>
+  <text x="646" y="158" class="w" text-anchor="middle">Vaadin screens</text>
+  <text x="450" y="328" class="title">Forms is the shell</text>
+  <text x="450" y="356" class="text">Screen by screen, the logic and the</text>
+  <text x="450" y="378" class="text">UI move to Java. Same database.</text>
+
+  <line x1="770" y1="184" x2="826" y2="184" stroke="#0f0f0f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 3 -->
+  <text x="840" y="56" class="step">Step 3</text>
+  <rect x="840" y="74" width="300" height="220" rx="8" class="chrome"/>
+  <rect x="840" y="74" width="300" height="26" rx="8" fill="#056ff0"/>
+  <rect x="840" y="88" width="300" height="12" fill="#056ff0"/>
+  <circle cx="858" cy="87" r="4" fill="#ffffff" fill-opacity="0.7"/>
+  <circle cx="872" cy="87" r="4" fill="#ffffff" fill-opacity="0.7"/>
+  <circle cx="886" cy="87" r="4" fill="#ffffff" fill-opacity="0.7"/>
+  <rect x="858" y="116" width="80" height="160" rx="4" class="vaadin" fill-opacity="0.75"/>
+  <rect x="950" y="116" width="172" height="74" rx="4" class="vaadin"/>
+  <rect x="950" y="202" width="82" height="74" rx="4" class="vaadin"/>
+  <rect x="1040" y="202" width="82" height="74" rx="4" class="vaadin"/>
+  <text x="1036" y="158" class="w" text-anchor="middle">Vaadin app</text>
+  <text x="840" y="328" class="title">Forms retired</text>
+  <text x="840" y="356" class="text">The same screens run in the browser.</text>
+  <text x="840" y="378" class="text">No big-bang switch-over.</text>
+</svg>

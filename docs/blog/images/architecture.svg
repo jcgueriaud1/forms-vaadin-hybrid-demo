@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" width="1200" height="660" font-family="'NB International Pro', Inter, Arial, sans-serif">
+  <title>Architecture: a Vaadin view embedded in an Oracle Forms screen</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f0f0f"/>
+    </marker>
+    <style>
+      .eyebrow { font-family: 'NB International Pro Mono', 'Noto Sans Mono', Menlo, monospace; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; fill: #575757; }
+      .title { font-size: 20px; font-weight: 700; fill: #0f0f0f; }
+      .title-w { font-size: 20px; font-weight: 700; fill: #ffffff; }
+      .text { font-size: 15px; fill: #3f3f3f; }
+      .text-w { font-size: 15px; fill: #ffffff; fill-opacity: 0.85; }
+      .mono { font-family: 'NB International Pro Mono', 'Noto Sans Mono', Menlo, monospace; font-size: 13px; fill: #3f3f3f; }
+      .link { stroke: #0f0f0f; stroke-width: 2; fill: none; }
+      .forms { fill: #ffffff; stroke: #878787; stroke-width: 1.5; }
+      .vaadin { fill: #056ff0; }
+      .bridge { fill: #4b2eff; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="660" fill="#f0f4f7"/>
+
+  <!-- Forms client -->
+  <rect x="40" y="40" width="520" height="580" rx="14" fill="#ffffff" fill-opacity="0.55" stroke="#9f9f9f" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="64" y="74" class="eyebrow">User's desktop · Forms client (Java 21)</text>
+
+  <rect x="70" y="96" width="460" height="110" rx="8" class="forms"/>
+  <text x="94" y="132" class="title">Oracle Forms screen</text>
+  <text x="94" y="160" class="text">Customers block, menus, status bar</text>
+  <text x="94" y="184" class="mono">rendered by the Forms applet</text>
+
+  <rect x="70" y="262" width="460" height="96" rx="8" class="bridge"/>
+  <text x="94" y="298" class="title-w">Bean area: VaadinBean</text>
+  <text x="94" y="326" class="text-w">a Forms Pluggable Java Component (VBean)</text>
+
+  <rect x="70" y="414" width="460" height="70" rx="8" class="vaadin"/>
+  <text x="94" y="456" class="title-w">swing-kit JVaadinPanel</text>
+
+  <rect x="70" y="520" width="460" height="76" rx="8" class="vaadin"/>
+  <text x="94" y="552" class="title-w">Embedded Chromium (JCEF)</text>
+  <text x="94" y="578" class="text-w">shows the Vaadin view inside the Forms window</text>
+
+  <!-- inside the client -->
+  <line x1="300" y1="208" x2="300" y2="260" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="314" y="239" class="mono">setProperty · CustomEvent</text>
+  <line x1="300" y1="360" x2="300" y2="412" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="314" y="391" class="mono">Java calls · events</text>
+  <line x1="300" y1="486" x2="300" y2="518" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="314" y="507" class="mono">JS bridge</text>
+
+  <!-- Forms server -->
+  <rect x="700" y="70" width="250" height="172" rx="10" class="forms"/>
+  <text x="722" y="100" class="eyebrow">Server</text>
+  <text x="722" y="130" class="title">Forms server</text>
+  <text x="722" y="158" class="text">WebLogic + Forms runtime</text>
+  <text x="722" y="186" class="mono">hybrid_demo.fmx</text>
+  <text x="722" y="210" class="mono">PL/SQL triggers</text>
+
+  <!-- Vaadin server -->
+  <rect x="700" y="444" width="250" height="172" rx="10" class="vaadin"/>
+  <text x="722" y="474" class="eyebrow" fill="#ffffff" style="fill:#ffffff;fill-opacity:0.8">Server</text>
+  <text x="722" y="504" class="title-w">Vaadin server</text>
+  <text x="722" y="532" class="text-w">Spring Boot · Vaadin 25</text>
+  <text x="722" y="560" class="text-w">HelloView (@Bridge)</text>
+  <text x="722" y="584" class="text-w">OrderRepository</text>
+
+  <!-- Database -->
+  <path d="M1000,250 a85,22 0 0,1 170,0 v190 a85,22 0 0,1 -170,0 z" fill="#ffffff" stroke="#0f0f0f" stroke-width="1.5"/>
+  <path d="M1000,250 a85,22 0 0,0 170,0" fill="none" stroke="#0f0f0f" stroke-width="1.5"/>
+  <text x="1085" y="318" class="title" text-anchor="middle">Oracle</text>
+  <text x="1085" y="342" class="title" text-anchor="middle">Database</text>
+  <text x="1085" y="374" class="text" text-anchor="middle">one schema</text>
+  <text x="1085" y="400" class="mono" text-anchor="middle">CUSTOMERS</text>
+  <text x="1085" y="420" class="mono" text-anchor="middle">ORDERS</text>
+
+  <!-- Client <-> servers -->
+  <line x1="532" y1="151" x2="698" y2="151" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="630" y="140" class="mono" text-anchor="middle">Forms protocol</text>
+  <line x1="532" y1="558" x2="698" y2="558" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="630" y="547" class="mono" text-anchor="middle">HTTP · UIDL</text>
+
+  <!-- Servers -> DB -->
+  <line x1="952" y1="170" x2="1020" y2="250" class="link" marker-end="url(#arrow)"/>
+  <text x="992" y="196" class="mono">SQL</text>
+  <line x1="952" y1="520" x2="1020" y2="462" class="link" marker-end="url(#arrow)"/>
+  <text x="992" y="512" class="mono">JDBC</text>
+
+  <!-- Legend -->
+  <rect x="700" y="292" width="16" height="16" rx="3" class="forms"/>
+  <text x="726" y="305" class="text">Oracle Forms</text>
+  <rect x="700" y="320" width="16" height="16" rx="3" class="vaadin"/>
+  <text x="726" y="333" class="text">Vaadin</text>
+  <rect x="700" y="348" width="16" height="16" rx="3" class="bridge"/>
+  <text x="726" y="361" class="text">The bridge (this demo)</text>
+</svg>

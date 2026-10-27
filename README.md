@@ -22,6 +22,9 @@ Both sides use the same database through separate sessions: each table has one
 writer per screen, and the writer tells the other side after it commits. See
 [ADR-0003](docs/adr/0003-one-writer-per-table-events-for-refresh.md).
 
+The blog post draft, with architecture diagrams, is in
+[docs/blog](docs/blog/incremental-oracle-forms-to-vaadin.md).
+
 ## The view's look
 
 The view uses Vaadin's Aura theme configured to look like the Forms screen
