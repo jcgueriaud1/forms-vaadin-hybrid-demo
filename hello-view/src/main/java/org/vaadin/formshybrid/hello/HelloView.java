@@ -92,8 +92,12 @@ public class HelloView extends VerticalLayout implements HelloCallable, BeforeEn
     /** Outside Forms, a customer can be chosen with ?customer=<id>, to try the view in a browser. */
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        event.getLocation().getQueryParameters().getSingleParameter("customer")
-                .ifPresent(id -> showCustomer(id, ""));
+        var parameters = event.getLocation().getQueryParameters();
+        parameters.getSingleParameter("customer").ifPresent(id -> showCustomer(id, ""));
+        // ?theme=default shows plain Aura, to compare with the Oracle Forms look
+        if (parameters.getSingleParameter("theme").filter("default"::equals).isPresent()) {
+            event.getUI().getPage().executeJs("document.documentElement.classList.add('aura-default')");
+        }
     }
 
     @Override

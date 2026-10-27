@@ -7,6 +7,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @StyleSheet(Aura.STYLESHEET)
+// The Oracle Forms look (compact, square, Forms colours); ?theme=default turns it off
+@StyleSheet("styles.css")
 @SpringBootApplication
 public class Application implements AppShellConfigurator {
 

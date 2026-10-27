@@ -22,6 +22,24 @@ Both sides use the same database through separate sessions: each table has one
 writer per screen, and the writer tells the other side after it commits. See
 [ADR-0003](docs/adr/0003-one-writer-per-table-events-for-refresh.md).
 
+## The view's look
+
+The view uses Vaadin's Aura theme configured to look like the Forms screen
+around it (`hello-view/src/main/resources/META-INF/resources/oracle-forms-compact.css`):
+compact density, square corners, Java's "Dialog" font that Forms uses, the
+Forms canvas colour, white fields with thin grey borders, Grid rows as tall as
+Forms records with cell borders, the selected row in the Forms current-record
+navy, and dialogs with a Forms-like blue title bar. It's plain Aura
+configuration, not per-view styling, so other migrated screens get it too.
+
+| Default Aura | Oracle Forms look |
+| --- | --- |
+| ![Default Aura](docs/images/theme-before.png) | ![Oracle Forms look](docs/images/theme-after.png) |
+
+Grid rows went from 33 px to 25 px (the Forms record height): the bean area
+now fits about 14 orders instead of 10. To compare in a browser, open
+http://localhost:8080/?customer=103&theme=default for plain Aura.
+
 ## Layout
 
 ```

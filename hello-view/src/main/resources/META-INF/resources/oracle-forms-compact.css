@@ -1,0 +1,79 @@
+/*
+ * Oracle Forms look for the embedded view (issue #19): compact, square, the
+ * Forms font and colours, so the view reads as part of the Forms screen.
+ * Light only: Forms has no dark mode. The colours were sampled from the Forms
+ * client (Oracle look and feel). Open the view with ?theme=default to compare
+ * with plain Aura; that adds the aura-default class to <html>.
+ */
+
+/* Core Aura configuration */
+html:not(.aura-default) {
+  color-scheme: light;
+  /* the Forms current-record highlight */
+  --aura-accent-color-dark: #818CF8;
+  --aura-accent-color-light: #404080;
+  /* the Forms canvas */
+  --aura-background-color-dark: #131822;
+  --aura-background-color-light: #eaeff5;
+  --aura-base-radius: -1;
+  --aura-base-size: 12;
+  --aura-contrast-level: 2;
+  /* Java's "Dialog" font, which Forms uses: Lucida Grande on macOS, Arial on
+     Windows, DejaVu Sans on Linux */
+  --aura-font-family: 'Lucida Grande', Arial, 'DejaVu Sans', var(--aura-font-family-system);
+  --aura-overlay-surface-opacity: 1;
+  --aura-surface-level: -0.5;
+  --aura-surface-opacity: 1;
+}
+
+/* Fields and buttons: white fields with the thin grey Forms border, no shadows */
+html:not(.aura-default) {
+  --vaadin-button-border-color: #a7a7a7;
+  --vaadin-button-shadow: none;
+  --vaadin-focus-ring-color: #404080;
+  --vaadin-input-field-background: #ffffff;
+  --vaadin-input-field-border-color: #a7a7a7;
+  --vaadin-input-field-border-width: 1px;
+}
+
+html:not(.aura-default) :is(vaadin-button, vaadin-menu-bar-button):not([theme~="primary"], [theme~="tertiary"]) {
+  --aura-accent-color-light: var(--aura-neutral);
+  --vaadin-button-background: #ffffff;
+}
+
+/* Grid: like a multi-record Forms block, with tight rows, cell borders and the
+   current record in navy */
+html:not(.aura-default) vaadin-grid {
+  --vaadin-grid-background: #ffffff;
+  --vaadin-grid-border-color: #a7a7a7;
+  --vaadin-grid-cell-padding: 2px 6px;
+  --vaadin-grid-column-border-width: 1px;
+  --vaadin-grid-header-font-weight: normal;
+  --vaadin-grid-row-background-color: #ffffff;
+  --vaadin-grid-row-selected-background-color: #404080;
+}
+
+html:not(.aura-default) vaadin-grid::part(selected-row-cell) {
+  color: #ffffff;
+}
+
+html:not(.aura-default) vaadin-grid::part(header-cell) {
+  background: #eaeff5;
+}
+
+/* Dialog: a Forms window, with its blue title bar */
+html:not(.aura-default) vaadin-dialog {
+  --vaadin-dialog-border-color: #a7a7a7;
+  --vaadin-dialog-border-radius: 0;
+  --vaadin-dialog-border-width: 1px;
+  --vaadin-dialog-padding: 8px;
+  --vaadin-dialog-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  --vaadin-dialog-title-color: #ffffff;
+  --vaadin-dialog-title-font-size: var(--aura-font-size-m);
+  --vaadin-dialog-title-font-weight: normal;
+}
+
+html:not(.aura-default) vaadin-dialog::part(header) {
+  background: #2e84c5;
+  padding: 3px 8px;
+}
