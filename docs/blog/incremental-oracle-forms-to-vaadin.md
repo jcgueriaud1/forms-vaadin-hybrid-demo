@@ -99,7 +99,6 @@ This hybrid approach keeps users productive while screens move over. For the
 screens themselves, see how AI can speed up the rewrite:
 [Oracle Forms to Java: a two-week AI migration experiment](https://vaadin.com/blog/oracle-forms-to-java-a-two-week-ai-migration-experiment).
 
-Planning a migration of your own? Our
-[Migration Assessment](https://pages.vaadin.com/vaadin-application-assessment-for-migration)
-looks at your application and gives you a plan, effort estimate and phasing,
-so you can move to a long-term solution safely. We're happy to help.
+Planning a migration of your own?
+[Talk to us about your Oracle Forms application](https://vaadin.com/oracle-forms#form-section):
+we assess it with you and help you move to a long-term solution safely.
