@@ -172,7 +172,7 @@ orders.
 | The client fails with FRM-93136 | The `[hybrid]` section in `formsweb.cfg` lacks `baseSAAfile=basesaa.txt` (only possible after editing it by hand) | Add that line to the section |
 | The client hangs on its splash screen (macOS) | JCEF started while the window was moving | Fixed in the bean; restart the client, and don't move the window during the first seconds |
 | `IllegalAccessError … sun.awt` | The JVM lacks the `--add-opens` flags | Start through `run-forms-client.sh` / `.cmd`, not plain `java -jar` |
-| The bean area shows a browser error page | The Vaadin view isn't running | Start step 5, then restart the client |
+| The bean area says "The Vaadin view isn't available." | The Vaadin view isn't running, or isn't answering | Start step 5. No need to restart the client: the bean checks every 5 s and loads the view when the server is back |
 | A Vaadin licence screen inside the Forms window | No Vaadin licence key | Step 4 |
 | The view shows "Not found in the database." or the greeting never appears; the view's log shows `HikariPool` or `ORA-` errors | The view can't reach the demo schema | Check port 1521 is published and `setup-db.sh` ran; set `HYBRID_JDBC_URL` if your database differs |
 | Clicking customers changes nothing in the view | The view isn't connected, or calls are blocked | Restart the client with `JAVA_OPTS=-Dhybrid.debug=true ./run-forms-client.sh` and look at `~/hybrid-bean.log` and swing-kit's lines on the console |

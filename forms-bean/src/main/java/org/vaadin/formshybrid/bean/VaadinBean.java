@@ -10,9 +10,17 @@ import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
 import java.awt.EventQueue;
 import java.awt.event.HierarchyEvent;
+import java.io.IOException;
 import java.io.Serializable;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.URI;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
@@ -21,6 +29,8 @@ import javax.swing.Timer;
 import com.vaadin.swingkit.client.JVaadinPanel;
 import com.vaadin.swingkit.client.SwingVaadinClient;
 import com.vaadin.swingkit.core.VaadinSwingEvent;
+
+import org.cef.browser.CefBrowser;
 
 import oracle.forms.handler.IHandler;
 import oracle.forms.properties.ID;
@@ -48,6 +58,15 @@ import org.vaadin.formshybrid.contract.HybridEvents;
  *
  * The view URL defaults to {@value #DEFAULT_URL} and can be overridden with the
  * {@code -Dhybrid.url=...} JVM option.
+ *
+ * The view server may be down, slow or restarted (issue #13); Forms must keep
+ * working regardless. The bean checks every {@value #PROBE_SECONDS} s that the
+ * server accepts connections, shows a placeholder while it doesn't, and reloads
+ * the view when it's back (the ready event then replays the current customer).
+ * A view that doesn't load within {@value #LOAD_TIMEOUT_SECONDS} s (an error
+ * page, a server still starting) counts as unavailable too, so it is retried.
+ * Calls time out after {@value #CALL_TIMEOUT_SECONDS} s, and only the latest
+ * customer is ever pushed, so a slow view never builds up a queue.
  */
 public class VaadinBean extends VBean {
 
@@ -60,6 +79,12 @@ public class VaadinBean extends VBean {
 
     static final String DEFAULT_URL = "http://localhost:8080/";
     private static final int START_DELAY_MS = 1500;
+    static final int PROBE_SECONDS = 5;
+    static final int CALL_TIMEOUT_SECONDS = 10;
+    static final int LOAD_TIMEOUT_SECONDS = 15;
+    // swing-kit's event for a page that failed to load
+    private static final String EXCEPTION_EVENT = "exception";
+    private static final int CONNECT_TIMEOUT_MS = 2000;
 
     private static final String STATUS_CARD = "status";
     private static final String VIEW_CARD = "view";
@@ -74,10 +99,24 @@ public class VaadinBean extends VBean {
         return t;
     });
 
+    // Checks the view server off the Forms thread.
+    private final ScheduledExecutorService probe = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "hybrid-bean-probe");
+        t.setDaemon(true);
+        return t;
+    });
+    private final AtomicBoolean pushQueued = new AtomicBoolean();
+    private final AtomicInteger loads = new AtomicInteger();
+
     private IHandler handler;
+    private String url;
     private boolean started;
     private volatile JVaadinPanel panel;
     private volatile boolean viewReady;
+    // false while the server is unreachable or the view stopped answering
+    private volatile boolean available = true;
+    // a Forms dialog is over the bean (AWT thread only)
+    private boolean covered;
     private volatile String[] currentCustomer;
     private volatile String greeting = "";
     private volatile String orderCustomerId = "";
@@ -121,22 +160,33 @@ public class VaadinBean extends VBean {
 
     /** JCEF start-up is slow (and downloads Chromium on first run): never on the Forms thread. */
     private void startPanel() {
-        String url = System.getProperty("hybrid.url", DEFAULT_URL);
+        url = System.getProperty("hybrid.url", DEFAULT_URL);
         try {
+            SwingVaadinClient.getConfiguration().setTimeout(CALL_TIMEOUT_SECONDS);
             BeanLog.debug("building panel for " + url);
             JVaadinPanel p = SwingVaadinClient.getBuilder().build(url);
+            // swing-kit's own handler answers a load error with a modal message
+            // box (which would block Forms) or its "Unreachable" page; the bean
+            // shows its placeholder and retries instead.
+            p.removeDefaultExceptionHandler();
+            p.addEventListener(EXCEPTION_EVENT, this::onLoadError);
             p.addEventListener(HybridEvents.READY, e -> onViewReady());
             p.addEventListener(HybridEvents.GREET, this::onGreet);
             p.addEventListener(HybridEvents.ORDER_SAVED, this::onOrderSaved);
             panel = p;
             BeanLog.debug("panel built, isReady=" + p.isReady());
+            // The page may have attached (and sent ready) before the listener
+            // existed; swing-kit's ready flag covers that case.
+            if (p.isReady()) {
+                onViewReady();
+            }
             EventQueue.invokeLater(() -> {
                 add(p, VIEW_CARD);
-                cards.show(this, VIEW_CARD);
-                validate();
-                repaint();
+                showCard();
             });
             pushCustomer();
+            expectLoaded();
+            probe.scheduleWithFixedDelay(this::checkServer, 0, PROBE_SECONDS, TimeUnit.SECONDS);
             EventQueue.invokeLater(this::watchFormsDialogs);
             EventQueue.invokeLater(() -> keyboard = BrowserKeyboard.install(p));
         } catch (Throwable t) {
@@ -176,22 +226,114 @@ public class VaadinBean extends VBean {
             return;
         }
         Rectangle bean = javax.swing.SwingUtilities.convertRectangle(getParent(), getBounds(), desktop);
-        boolean covered = false;
+        boolean now = false;
         for (Component c : desktop.getComponents()) {
             if (c != own && c instanceof FWindow && c.isVisible() && c.getBounds().intersects(bean)) {
-                covered = true;
+                now = true;
                 break;
             }
         }
-        if (covered == p.isVisible()) {
+        if (now != covered) {
+            covered = now;
             BeanLog.debug(covered ? "Forms dialog over the view: hiding the browser" : "Forms dialog closed: showing the browser");
             if (covered && keyboard != null) {
                 keyboard.formsTookFocus();
             }
-            status.setText("Answer the Forms dialog to continue.");
-            cards.show(this, covered ? STATUS_CARD : VIEW_CARD);
-            validate();
+            showCard();
             desktop.repaint();
+        }
+    }
+
+    /**
+     * The browser is shown only while the view is available and no Forms dialog
+     * is over it; otherwise the placeholder says why. AWT thread only.
+     */
+    private void showCard() {
+        if (panel == null) {
+            return;
+        }
+        if (covered) {
+            status.setText("Answer the Forms dialog to continue.");
+        } else if (!available) {
+            status.setText("<html><center>The Vaadin view isn't available.<br>"
+                    + "Forms keeps working; the view comes back by itself.</center></html>");
+            if (keyboard != null) {
+                keyboard.formsTookFocus();
+            }
+        }
+        cards.show(this, covered || !available ? STATUS_CARD : VIEW_CARD);
+        validate();
+        repaint();
+    }
+
+    /** Runs every few seconds on the probe thread. */
+    private void checkServer() {
+        boolean reachable = serverAcceptsConnections();
+        if (!reachable && available) {
+            setAvailable(false, "server not reachable");
+        } else if (reachable && !available) {
+            // A new page and Vaadin session: its ready event replays the customer.
+            BeanLog.debug("server reachable again: reloading the view");
+            viewReady = false;
+            setAvailable(true, "server reachable again");
+            EventQueue.invokeLater(this::loadView);
+            expectLoaded();
+        }
+    }
+
+    /**
+     * Navigates to the view URL rather than calling the panel's reload(), which
+     * reloads whatever page is showing, possibly an error page. AWT thread.
+     */
+    private void loadView() {
+        CefBrowser browser = BrowserKeyboard.browserOf(panel);
+        if (browser != null) {
+            browser.loadURL(url);
+        } else {
+            panel.reload();
+        }
+    }
+
+    /** A page load failed (server down, connection reset…): retry it later. */
+    private void onLoadError(VaadinSwingEvent event) {
+        Object content = event.getParams().get("content");
+        // ERR_ABORTED: a load replaced by another one, e.g. our own retry
+        if (String.valueOf(content).contains("ERR_ABORTED")) {
+            return;
+        }
+        setAvailable(false, String.valueOf(content));
+    }
+
+    /** If the page just requested hasn't sent its ready event in time, retry it. */
+    private void expectLoaded() {
+        int load = loads.incrementAndGet();
+        probe.schedule(() -> {
+            if (load == loads.get() && available && !viewReady) {
+                setAvailable(false, "the view didn't load in " + LOAD_TIMEOUT_SECONDS + " s");
+            }
+        }, LOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /**
+     * A plain TCP connect: cheap, and unlike an HTTP request to the view it
+     * doesn't create a Vaadin session every few seconds.
+     */
+    private boolean serverAcceptsConnections() {
+        try (Socket socket = new Socket()) {
+            URI uri = URI.create(url);
+            int port = uri.getPort() != -1 ? uri.getPort() : "https".equals(uri.getScheme()) ? 443 : 80;
+            socket.connect(new InetSocketAddress(uri.getHost(), port), CONNECT_TIMEOUT_MS);
+            return true;
+        } catch (IOException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private void setAvailable(boolean value, String why) {
+        if (available != value) {
+            available = value;
+            BeanLog.warn("Vaadin view " + (value ? "available" : "unavailable") + ": " + why);
+            EventQueue.invokeLater(this::showCard);
         }
     }
 
@@ -240,20 +382,35 @@ public class VaadinBean extends VBean {
     private void pushCustomer() {
         String[] customer = currentCustomer;
         JVaadinPanel p = panel;
-        // The view's ready event can fire while build() is still loading the page,
-        // before our listener exists, so swing-kit's own load state counts too.
-        if (customer == null || p == null || !(viewReady || p.isReady())) {
+        if (customer == null || p == null || !viewReady) {
             BeanLog.debug("pushCustomer deferred: customer=" + (customer != null) + " panel="
-                    + (p != null) + " viewReady=" + viewReady + " isReady=" + (p != null && p.isReady()));
+                    + (p != null) + " viewReady=" + viewReady);
+            return;
+        }
+        if (!available) {
+            BeanLog.debug("pushCustomer deferred: view unavailable");
+            return;
+        }
+        // Only the latest customer matters: if a push is already queued, it will
+        // pick this one up, so a slow view never builds up a queue of calls.
+        if (!pushQueued.compareAndSet(false, true)) {
             return;
         }
         calls.submit(() -> {
+            pushQueued.set(false);
+            if (!available || !viewReady) {
+                return; // the next ready event replays the customer
+            }
+            String[] latest = currentCustomer;
             try {
-                BeanLog.debug("calling showCustomer(" + customer[0] + ", " + customer[1] + ")");
-                p.as(HelloCallable.class).showCustomer(customer[0], customer[1]);
+                BeanLog.debug("calling showCustomer(" + latest[0] + ", " + latest[1] + ")");
+                p.as(HelloCallable.class).showCustomer(latest[0], latest[1]);
                 BeanLog.debug("showCustomer returned");
             } catch (Throwable t) {
+                // Typically a timeout: the server is up but the page isn't
+                // answering (an expired session, a broken page). Reload it.
                 BeanLog.warn("showCustomer failed", t);
+                setAvailable(false, "the view didn't answer");
             }
         });
     }
@@ -281,6 +438,7 @@ public class VaadinBean extends VBean {
             keyboard.uninstall();
         }
         calls.shutdownNow();
+        probe.shutdownNow();
         super.destroy();
     }
 }

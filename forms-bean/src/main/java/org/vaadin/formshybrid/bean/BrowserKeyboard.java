@@ -179,7 +179,7 @@ final class BrowserKeyboard {
      * panel it returns is a generated proxy subclass, so look up the hierarchy.
      * The bean and swing-kit share a class loader, so no --add-opens is needed.
      */
-    private static CefBrowser browserOf(JVaadinPanel panel) {
+    static CefBrowser browserOf(JVaadinPanel panel) {
         for (Class<?> c = panel.getClass(); c != null; c = c.getSuperclass()) {
             try {
                 Field f = c.getDeclaredField("cefBrowser");

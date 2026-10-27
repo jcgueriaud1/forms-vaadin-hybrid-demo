@@ -95,6 +95,18 @@ and swing-kit logs its calls and events (at debug level) on the console.
   dialog to continue.") instead of the browser until they close. Reproduce with
   `HYBRID_FORMS_PARAMS='&otherparams=alert_test=YES' ./run-forms-client.sh`: an
   alert opens 12 seconds after start.
+- **When the Vaadin server is down, slow or restarted, Forms keeps working.**
+  The bean checks every 5 s that the server accepts connections (a TCP
+  connect, so no Vaadin session per check), and treats a page that fails to
+  load, doesn't send its ready event within 15 s, or doesn't answer a call
+  within 10 s (swing-kit's default is 300 s) as unavailable. It then shows a
+  placeholder in the bean area, and loads the view URL again when the server
+  is back; the ready event replays the current customer. Only the latest
+  customer is ever pushed, so a slow view never builds up a queue. swing-kit's
+  default load-error handling is removed: it opens a modal Swing message box
+  (which would block Forms) or its own "Unreachable" page, which its
+  `reload()` then reloads instead of the view. Forms itself isn't told: the
+  placeholder in the bean area is enough, and the form works without the view.
 - **Keyboard between Forms and the browser.** Clicking the browser gives it
   the keyboard, but AWT's focus owner stays on the last Forms item, so keys the
   page doesn't consume (arrows, Tab, Enter) also reached Forms: Down in the
