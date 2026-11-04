@@ -13,7 +13,7 @@
   the bean runs on the user's machine, so the view couldn't trust it.
 -->
 <Module version="122010400" xmlns="http://xmlns.oracle.com/Forms">
-   <FormModule Name="HYBRID_NOTES" Title="Forms and Vaadin: who is the user?" ConsoleWindow="MAIN">
+   <FormModule Name="HYBRID_NOTES" Title="Forms and Vaadin: who is the user?" MenuModule="hybrid_menu" ConsoleWindow="MAIN">
       <Coordinate CharacterCellWidth="5" RealUnit="Point" DefaultFontScaling="true" CharacterCellHeight="14" CoordinateSystem="Real"/>
       <Block Name="CUSTOMERS" QueryDataSourceName="CUSTOMERS" OrderByClause="NAME" RecordsDisplayCount="6" InsertAllowed="false" UpdateAllowed="false" DeleteAllowed="false" RecordVisualAttributeGroupName="CURRENT_RECORD" ShowScrollbar="true" ScrollbarCanvasName="MAIN" ScrollbarXPosition="512" ScrollbarYPosition="40" ScrollbarWidth="12" ScrollbarLength="84">
          <Item Name="ID" ItemType="Text Item" DataType="Number" MaximumLength="6" ColumnName="ID" CanvasName="MAIN" XPosition="16" YPosition="40" Width="44" Height="14" BackColor="white" Prompt="Id" PromptAttachmentEdge="Top" PromptAlign="Center" PromptDisplayStyle="First Record"/>

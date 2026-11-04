@@ -6,6 +6,7 @@
 #   JAVA_OPTS="-Dhybrid.url=..." ./run-forms-client.sh
 #   HYBRID_FORMS_PARAMS='&otherparams=alert_test=YES' ./run-forms-client.sh   (issue #6 reproducer)
 #   HYBRID_FORMS_CONFIG=hybrid-notes ./run-forms-client.sh   (identity showcase: log in as alice/alice or bob/bob)
+#   HYBRID_FORMS_CONFIG=hybrid-orders ./run-forms-client.sh  (the screen fully migrated to Vaadin)
 #
 # The JVM: on macOS the installed JDK of that version, else $JAVA_HOME if
 # set, else `java` on the PATH. FSAL runs the client with `java -jar frmsal.jar`, so

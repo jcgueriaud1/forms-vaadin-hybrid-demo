@@ -1,0 +1,25 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<!--
+  The menu both forms share (their MenuModule property): a Forms menu that
+  switches between the demo's forms. This XML is the source of truth;
+  deploy-form.sh turns it into hybrid_menu.mmb with frmxml2f and compiles it.
+
+  NEW_FORM replaces the current form in the same session, so the next form runs
+  as the user already logged in: as HYBRID from [hybrid], or as ALICE or BOB
+  from [hybrid-notes]. ALICE and BOB can't read ORDER_TOTALS, so for them the
+  customers and orders form shows no orders totals.
+-->
+<Module version="122010400" xmlns="http://xmlns.oracle.com/Forms">
+   <MenuModule Name="HYBRID_MENU" MainMenu="MAIN_MENU">
+      <Menu Name="MAIN_MENU">
+         <MenuItem Name="FORMS" Label="Forms" SubMenuName="FORMS_MENU" CommandType="Menu"/>
+      </Menu>
+      <Menu Name="FORMS_MENU">
+         <MenuItem Name="HYBRID_DEMO" Label="Customers and orders" MenuItemCode="IF GET_APPLICATION_PROPERTY(CURRENT_FORM_NAME) &lt;&gt; 'HYBRID_DEMO' THEN&amp;#10;  NEW_FORM('hybrid_demo');&amp;#10;END IF;"/>
+         <MenuItem Name="HYBRID_ORDERS" Label="Customers and orders (Vaadin)" MenuItemCode="IF GET_APPLICATION_PROPERTY(CURRENT_FORM_NAME) &lt;&gt; 'HYBRID_ORDERS' THEN&amp;#10;  NEW_FORM('hybrid_orders');&amp;#10;END IF;"/>
+         <MenuItem Name="HYBRID_NOTES" Label="Customer notes" MenuItemCode="IF GET_APPLICATION_PROPERTY(CURRENT_FORM_NAME) &lt;&gt; 'HYBRID_NOTES' THEN&amp;#10;  NEW_FORM('hybrid_notes');&amp;#10;END IF;"/>
+         <MenuItem Name="SEPARATOR1" MenuItemType="Separator" Label="" CommandType="Null"/>
+         <MenuItem Name="EXIT" Label="Exit" MenuItemCode="DO_KEY('EXIT_FORM');"/>
+      </Menu>
+   </MenuModule>
+</Module>

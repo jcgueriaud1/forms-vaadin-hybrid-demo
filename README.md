@@ -83,10 +83,23 @@ The short version, once the Forms server is running:
 ```bash
 ./setup-db.sh               # create the HYBRID schema
 ./deploy-bean.sh            # build, self-sign and deploy hybrid-bean.jar
-./deploy-form.sh            # build the form, register the [hybrid] config
+./deploy-form.sh            # build the forms and their menu, register their configs
 (cd hello-view && mvn spring-boot:run)   # the embedded view, in its own terminal
 ./run-forms-client.sh       # the Forms client on Java 21 (Windows: run-forms-client.cmd)
 ```
+
+The forms share a **Forms** menu that switches between them in the same
+session:
+
+- **Customers and orders:** the hybrid screen above (`hybrid_demo`).
+- **Customers and orders (Vaadin):** the same screen fully migrated
+  (`hybrid_orders`). The form is only a host: its bean area fills the window
+  with the Vaadin `/orders` view, customers and their orders, edited in the
+  same dialog.
+- **Customer notes:** the identity showcase (`hybrid_notes`).
+
+To start on another form, pick its config:
+`HYBRID_FORMS_CONFIG=hybrid-orders ./run-forms-client.sh`.
 
 The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`. The bean reports
 problems on the client's console. For a trace of what it does, start the client
