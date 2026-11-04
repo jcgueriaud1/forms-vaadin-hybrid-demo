@@ -175,15 +175,18 @@ BEGIN
 END;
 /
 
--- The Forms users. Each logs in to Forms as itself, reads customers through a
--- synonym, and may issue tokens; nothing else.
+-- The Forms users. Each logs in to Forms as itself, reads customers and the
+-- orders totals (for the customers form, opened from the Forms menu) through
+-- synonyms, and may issue tokens; nothing else.
 BEGIN
   FOR u IN (SELECT column_value AS name FROM TABLE(sys.odcivarchar2list('ALICE', 'BOB'))) LOOP
     EXECUTE IMMEDIATE 'CREATE USER ' || u.name || ' IDENTIFIED BY ' || LOWER(u.name);
     EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || u.name;
     EXECUTE IMMEDIATE 'GRANT SELECT ON hybrid.customers TO ' || u.name;
     EXECUTE IMMEDIATE 'GRANT EXECUTE ON hybrid.issue_token TO ' || u.name;
+    EXECUTE IMMEDIATE 'GRANT SELECT ON hybrid.order_totals TO ' || u.name;
     EXECUTE IMMEDIATE 'CREATE SYNONYM ' || u.name || '.customers FOR hybrid.customers';
+    EXECUTE IMMEDIATE 'CREATE SYNONYM ' || u.name || '.order_totals FOR hybrid.order_totals';
   END LOOP;
 END;
 /
