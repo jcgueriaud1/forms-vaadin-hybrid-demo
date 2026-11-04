@@ -47,6 +47,7 @@ public final class HybridScreen implements AutoCloseable {
     private final Path logs = Path.of("target", "forms-ui-tests");
 
     private Process helloView;
+    private int viewPort;
     private Process formsClient;
     private Playwright playwright;
     private FormsClient forms;
@@ -71,6 +72,27 @@ public final class HybridScreen implements AutoCloseable {
     /** The embedded view's page, inside the Forms client. */
     public Page view() {
         return view;
+    }
+
+    /** Stops the view's server (hello-view), as when it crashes or is redeployed. */
+    public void stopView() {
+        stop(helloView);
+        helloView = null;
+    }
+
+    /** Starts the view's server on its port, unless it's running; waits until it answers. */
+    public void startView() throws IOException, InterruptedException {
+        if (helloView != null && helloView.isAlive()) {
+            return;
+        }
+        // Append, so the log keeps the server's earlier lives too.
+        File log = logs.resolve("hello-view.log").toFile();
+        helloView = new ProcessBuilder("mvn", "-q", "-B", "spring-boot:run",
+                "-Dspring-boot.run.arguments=--server.port=" + viewPort)
+                .directory(repo.resolve("hello-view").toFile())
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log)).start();
+        String url = "http://localhost:" + viewPort + "/";
+        waitFor("hello-view at " + url, helloView, "hello-view.log", Duration.ofMinutes(4), () -> answers(url));
     }
 
     /** A single number from the demo schema, for example a count to compare the screen with. */
@@ -141,11 +163,10 @@ public final class HybridScreen implements AutoCloseable {
         // Before anything connects: the reset kills the HYBRID sessions.
         run(List.of("./setup-db.sh"), repo, "setup-db.log", Duration.ofMinutes(3));
 
-        int viewPort = freePort();
-        helloView = start(List.of("mvn", "-q", "-B", "spring-boot:run",
-                "-Dspring-boot.run.arguments=--server.port=" + viewPort), repo.resolve("hello-view"), "hello-view.log");
+        viewPort = freePort();
+        Files.deleteIfExists(logs.resolve("hello-view.log"));
+        startView();
         String viewUrl = "http://localhost:" + viewPort + "/";
-        waitFor("hello-view at " + viewUrl, helloView, "hello-view.log", Duration.ofMinutes(4), () -> answers(viewUrl));
 
         int controlPort = freePort();
         int cdpPort = freePort();
