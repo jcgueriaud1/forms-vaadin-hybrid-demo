@@ -6,10 +6,12 @@ rem   run-forms-client.cmd
 rem   set JAVA_HOME=C:\path\to\jdk-21 & run-forms-client.cmd
 rem
 rem Uses %JAVA_HOME%\bin\java if JAVA_HOME is set, else java on the PATH.
+rem Identity showcase: set HYBRID_FORMS_CONFIG=hybrid-notes (log in as alice/alice or bob/bob)
 rem Debug trace (%USERPROFILE%\hybrid-bean.log): set JAVA_OPTS=-Dhybrid.debug=true
 rem Start hello-view first (localhost:8080).
 setlocal
 if "%HYBRID_FORMS_URL%"=="" set HYBRID_FORMS_URL=http://localhost:7777/forms
+if "%HYBRID_FORMS_CONFIG%"=="" set HYBRID_FORMS_CONFIG=hybrid
 set JAVA=java
 if not "%JAVA_HOME%"=="" set JAVA="%JAVA_HOME%\bin\java"
 set DIR=%TEMP%\fsal
@@ -24,4 +26,4 @@ curl -sf -o "%DIR%\frmsal.jar" "%HYBRID_FORMS_URL%/java/frmsal.jar" || (
 )
 %JAVA% -version
 %JAVA% --add-opens java.desktop/sun.awt=ALL-UNNAMED %JAVA_OPTS% -jar "%DIR%\frmsal.jar" ^
-  -url "%HYBRID_FORMS_URL%/frmservlet?config=hybrid" -t 10000
+  -url "%HYBRID_FORMS_URL%/frmservlet?config=%HYBRID_FORMS_CONFIG%" -t 10000

@@ -23,6 +23,13 @@ public final class HybridEvents {
     /** A plain decimal string with a '.' separator, for example "1053.00". */
     public static final String TOTAL = "total";
 
+    /**
+     * The view wants to know the Forms user: the form issues a one-time token
+     * and sets it on the bean, which passes it to {@link SignInCallable#signIn}.
+     * Views send it on every attach, so a reloaded view signs in again.
+     */
+    public static final String TOKEN_NEEDED = "tokenNeeded";
+
     private HybridEvents() {
     }
 }
