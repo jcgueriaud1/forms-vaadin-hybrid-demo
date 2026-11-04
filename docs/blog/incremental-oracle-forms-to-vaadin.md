@@ -7,8 +7,10 @@ the Forms window your users already know**.
 
 ![From Forms hosting Vaadin, to Forms as a shell, to a Vaadin-only app](images/migration-path.png)
 
-This post shows step 1 working: a Forms 12c screen with a live Vaadin view
-embedded in it, talking both ways and sharing the same Oracle database.
+This post shows the first two steps working: a Forms 12c screen with a live
+Vaadin view embedded in it, talking both ways and sharing the same Oracle
+database; then the same screen moved entirely to Vaadin, opened from the Forms
+menu like any other form.
 
 ![The Forms screen with the embedded Vaadin view](../images/theme-after.png)
 
@@ -73,14 +75,42 @@ public class HelloView extends VerticalLayout implements HelloCallable {
 And Forms picks the event up in `WHEN-CUSTOM-ITEM-EVENT` to update its
 **Orders total** column.
 
+## A whole screen in Vaadin
+
+Step 2 is the same mechanism with less Forms around it. The customer list moves
+to Vaadin too, and the form keeps only a bean area that fills its window:
+
+![Customers and their orders, all in Vaadin, inside the Forms window with its Forms menu](../images/vaadin-screen.png)
+
+The form has no blocks of data and no triggers but one, which tells the bean
+which Vaadin route to show:
+
+```sql
+-- WHEN-NEW-FORM-INSTANCE
+SET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'ROUTE', 'orders');
+```
+
+Users reach it the way they reach every other screen: from a **Forms** menu
+shared by all the forms, which switches with `NEW_FORM`:
+
+```sql
+-- Forms > Customers and orders (Vaadin)
+NEW_FORM('hybrid_orders');
+```
+
+Forms is now just the shell: the login, the window and the menu. Each screen
+that moves to Vaadin becomes one more menu entry. When the last one has moved,
+the Vaadin routes run in a browser and Forms can be retired.
+
 ## What we learned
 
 - **One writer per table.** Forms and Vaadin use separate database sessions,
   so each table has a single writer per screen, and the writer notifies the
   other side only after its commit.
-- **The browser is a native window.** It paints over Forms alerts and takes the
-  keyboard differently, so the bean hides the view while a Forms dialog is open
-  and routes keys to whichever side the user clicked.
+- **The browser is a native window.** It paints over Forms alerts and menus
+  and takes the keyboard differently, so the bean hides the view while a Forms
+  dialog or menu is open over it, and routes keys to whichever side the user
+  clicked.
 - **Forms must never depend on the view.** If the Vaadin server is down or slow,
   the bean shows a placeholder, keeps Forms working, and reloads the view when
   the server is back.
