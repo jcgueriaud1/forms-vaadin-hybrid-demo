@@ -20,7 +20,7 @@
   TEST_ALERT 12 seconds after it opens.
 -->
 <Module version="122010400" xmlns="http://xmlns.oracle.com/Forms">
-   <FormModule Name="HYBRID_DEMO" Title="Forms and Vaadin hybrid demo" ConsoleWindow="MAIN">
+   <FormModule Name="HYBRID_DEMO" Title="Forms and Vaadin hybrid demo" MenuModule="hybrid_menu" ConsoleWindow="MAIN">
       <Coordinate CharacterCellWidth="5" RealUnit="Point" DefaultFontScaling="true" CharacterCellHeight="14" CoordinateSystem="Real"/>
       <Alert Name="TEST_ALERT" Title="Forms alert test" AlertMessage="If you can read this, Forms alerts are not hidden behind the embedded Vaadin view." AlertStyle="Note" Button1Label="OK" Button2Label=""/>
       <Block Name="CUSTOMERS" QueryDataSourceName="CUSTOMERS" OrderByClause="NAME" RecordsDisplayCount="6" InsertAllowed="false" UpdateAllowed="false" DeleteAllowed="false" RecordVisualAttributeGroupName="CURRENT_RECORD" ShowScrollbar="true" ScrollbarCanvasName="MAIN" ScrollbarXPosition="512" ScrollbarYPosition="40" ScrollbarWidth="12" ScrollbarLength="84">

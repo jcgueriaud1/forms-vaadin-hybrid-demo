@@ -1,6 +1,7 @@
 #!/bin/bash
-# Build the forms (forms/*_fmb.xml) in the Forms container and register the
-# [hybrid] and [hybrid-notes] config sections. Idempotent.
+# Build the forms (forms/*_fmb.xml) and their menu (forms/*_mmb.xml) in the
+# Forms container and register the [hybrid], [hybrid-notes] and
+# [hybrid-orders] config sections. Idempotent.
 #
 #   ./deploy-form.sh
 #   HYBRID_FORMS_CONTAINER=myforms HYBRID_DB_HOST=mydb HYBRID_DB_SERVICE=FREEPDB1 ./deploy-form.sh
@@ -14,7 +15,7 @@ HYBRID_FORMS_CONTAINER=${HYBRID_FORMS_CONTAINER:-frfmw}
 SRC=/opt/oracle/user_projects/hybrid
 
 docker exec "$HYBRID_FORMS_CONTAINER" mkdir -p "$SRC"
-for xml in forms/*_fmb.xml; do
+for xml in forms/*_fmb.xml forms/*_mmb.xml; do
   docker cp "$xml" "$HYBRID_FORMS_CONTAINER:$SRC/"
 done
 docker cp forms/build.sh "$HYBRID_FORMS_CONTAINER:$SRC/"

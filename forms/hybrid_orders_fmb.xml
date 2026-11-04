@@ -1,0 +1,22 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<!--
+  A screen fully migrated to Vaadin: the form is only a host, its bean area
+  fills the window and shows the Vaadin orders view (customers, their orders,
+  and the order dialog). Nothing goes from Forms to the view but the route.
+  This XML is the source of truth; deploy-form.sh turns it into
+  hybrid_orders.fmb with frmxml2f and compiles it.
+-->
+<Module version="122010400" xmlns="http://xmlns.oracle.com/Forms">
+   <FormModule Name="HYBRID_ORDERS" Title="Customers and orders (Vaadin)" MenuModule="hybrid_menu" ConsoleWindow="MAIN">
+      <Coordinate CharacterCellWidth="5" RealUnit="Point" DefaultFontScaling="true" CharacterCellHeight="14" CoordinateSystem="Real"/>
+      <Block Name="CONTROL" DatabaseBlock="false">
+         <!-- Forms exits a form that has no navigable item, so the cursor waits
+              here, under the bean area. -->
+         <Item Name="FOCUS" ItemType="Text Item" DataType="Char" MaximumLength="1" CanvasName="MAIN" XPosition="0" YPosition="0" Width="1" Height="1" Bevel="None"/>
+         <Item Name="VAADIN_VIEW" ItemType="Bean Area" ImplementationClass="org.vaadin.formshybrid.bean.VaadinBean" CanvasName="MAIN" XPosition="0" YPosition="0" Width="552" Height="430" KeyboardNavigable="false" MouseNavigate="false"/>
+      </Block>
+      <Canvas Name="MAIN" WindowName="MAIN" Width="552" Height="430" ViewportWidth="552" ViewportHeight="430"/>
+      <Trigger Name="WHEN-NEW-FORM-INSTANCE" TriggerText="SET_WINDOW_PROPERTY(FORMS_MDI_WINDOW, TITLE, 'Customers and orders (Vaadin)');&amp;#10;SET_CUSTOM_PROPERTY('CONTROL.VAADIN_VIEW', 1, 'ROUTE', 'orders');"/>
+      <Window Name="MAIN" Title="Customers and orders" Width="552" Height="430"/>
+   </FormModule>
+</Module>
