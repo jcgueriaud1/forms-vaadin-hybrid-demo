@@ -15,6 +15,17 @@
         <module>hello-view</module>
     </modules>
 
+    <profiles>
+        <!-- Oracle Forms UI tests (ADR-0004): they need the running Docker environment,
+             so they're not part of the normal build. See the README. -->
+        <profile>
+            <id>forms-ui-tests</id>
+            <modules>
+                <module>forms-ui-tests</module>
+            </modules>
+        </profile>
+    </profiles>
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- The bean runs inside the Forms client JVM, which may be Java 8 (see ADR-0002);

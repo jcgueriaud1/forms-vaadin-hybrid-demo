@@ -51,6 +51,7 @@ forms/        hybrid_demo_fmb.xml: the host form (source of truth), build.sh: bu
 contract/     the interface and event names shared by both sides
 forms-bean/   the VBean → hybrid-bean.jar (Java 8 bytecode, self-signed)
 hello-view/   the embedded Vaadin 25 view (Spring Boot, localhost:8080, JDBC to the same schema)
+forms-ui-tests/  Oracle Forms UI tests: an agent for the Forms client, and tests that drive both halves
 ```
 
 ## Prerequisites
@@ -105,6 +106,33 @@ The first start downloads JCEF (~300 MB) to `~/.jcef-bundle`. The bean reports
 problems on the client's console. For a trace of what it does, start the client
 with `JAVA_OPTS=-Dhybrid.debug=true`: the bean then writes `~/hybrid-bean.log`
 and swing-kit logs its calls and events (at debug level) on the console.
+
+## Oracle Forms UI tests
+
+`forms-ui-tests/` drives the real hybrid screen: the Forms client and the
+Vaadin view inside it, the way a user would. An agent in the Forms client
+finds items by name and clicks them; Playwright attaches to the embedded
+browser over CDP. See [ADR-0004](docs/adr/0004-oracle-forms-ui-tests-agent-and-cdp.md).
+
+```bash
+mvn -Pforms-ui-tests -pl forms-ui-tests verify
+```
+
+- **Needs:** the Docker environment running, with the bean and the forms
+  deployed (`./deploy-bean.sh`, `./deploy-form.sh`), Maven, and Java 21. The
+  tests start everything else: they reset the schema with `setup-db.sh`, start
+  `hello-view` on a free port, and start a Forms client with the agent. Without
+  the environment the tests are reported as skipped.
+- **The reset disconnects a demo you have open.** Its Forms client loses its
+  database session; restart it afterwards. A `hello-view` you have running
+  reconnects by itself.
+- **macOS: the Forms window must come to the front once.** Forms ignores
+  clicks until its window has been active, and macOS doesn't let an app
+  started in the background activate itself. Started from a terminal or IDE
+  that is in front, it usually is. If not, the tests wait up to a minute and
+  print "click it once": click the Forms window. After that, clicks reach Forms
+  even if you switch to another app (the agent re-activates the window for Java).
+- Logs of the started processes: `forms-ui-tests/target/forms-ui-tests/`.
 
 ## Gotchas
 

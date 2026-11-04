@@ -17,8 +17,16 @@ Verified on 2026-11-04 on macOS x86_64 against the real client.
 1. **Forms side: a java agent inside the client JVM.** The harness adds
    `-javaagent:…` through `JAVA_OPTS` (`run-forms-client.sh` passes it on). The
    agent offers a local control port with commands to navigate, type, press keys
-   and read items or the status bar. It finds components by name and sends real
-   events with `Robot`, so Forms triggers fire as they would for a user.
+   and read items or the status bar. It finds components by name and posts the
+   events a user's input produces to the client's AWT event queue, so Forms
+   triggers fire as they would for a user. It doesn't use `java.awt.Robot`, which
+   would move the real mouse and needs Accessibility permission on macOS.
+   On macOS, Forms ignores clicks until its window has been active once, and
+   macOS 15 doesn't let an app started in the background activate itself
+   (`Desktop.requestForeground` and System Events were both ignored). The harness
+   therefore waits until the window has been active, and asks for one click if it
+   isn't. After that, the agent re-activates the window for Java (window and
+   focus events) before each click, so you can switch to other apps.
 2. **Component names come from `record=names`.** The harness adds
    `&record=names` through `HYBRID_FORMS_PARAMS`; the config already passes
    `record=%record%`. The Forms components are then named
@@ -41,12 +49,15 @@ Verified on 2026-11-04 on macOS x86_64 against the real client.
 4. **Known data.** The suite runs `setup-db.sh` before anything connects,
    because it kills the HYBRID sessions. Each test also restores the rows it
    changed, so tests don't depend on their order.
-5. **What the harness starts.** It starts `hello-view` in the test JVM on a
-   random port, passed to the bean with `-Dhybrid.url`. It also starts the Forms
+5. **What the harness starts.** It starts `hello-view` with
+   `mvn spring-boot:run` on a free port, passed to the bean with
+   `-Dhybrid.url`. It can't run in the test JVM: Spring Boot repackages its jar,
+   and Vaadin's dev mode looks for its project folder. It also starts the Forms
    client through `run-forms-client.sh`, and waits for the agent's port and the
    CDP port. It assumes the Docker environment is running, with the form and the
    bean deployed, and skips the tests when it isn't.
-6. **Local only for now:** a separate `hybrid-e2e` module run before releases
+6. **Local only for now:** a separate `forms-ui-tests` module, outside the
+   normal build (`mvn -Pforms-ui-tests -pl forms-ui-tests verify`), run before releases
    and upgrades. A nightly self-hosted x86_64 runner can run the same module
    later.
 

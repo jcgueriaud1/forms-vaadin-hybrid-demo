@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.vaadin.formshybrid</groupId>
+        <artifactId>forms-vaadin-hybrid</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>forms-ui-tests</artifactId>
+    <name>Oracle Forms UI tests</name>
+    <description>
+        Drive the running Forms client and its embedded view together (ADR-0004).
+        The jar is the agent loaded into the Forms client; the *IT tests run it.
+    </description>
+
+    <properties>
+        <!-- The agent runs in the Forms client JVM, which is Java 21 under FSAL (ADR-0002). -->
+        <maven.compiler.release>21</maven.compiler.release>
+        <!-- Pinned to the Playwright version DramaFinder 1.1.2 is built against. -->
+        <playwright.version>1.59.0</playwright.version>
+        <dramafinder.version>1.1.2</dramafinder.version>
+        <junit.version>6.0.3</junit.version>
+        <ojdbc.version>23.8.0.25.04</ojdbc.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>${playwright.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>dramafinder</artifactId>
+            <version>${dramafinder.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.database.jdbc</groupId>
+            <artifactId>ojdbc17</artifactId>
+            <version>${ojdbc.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Premain-Class>org.vaadin.formshybrid.formsui.agent.FormsAgent</Premain-Class>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.6</version>
+            </plugin>
+            <!-- The *IT tests run after the agent jar is packaged. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.6</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <forms.agent.jar>${project.build.directory}/${project.build.finalName}.jar</forms.agent.jar>
+                        <hybrid.repo.dir>${project.basedir}/..</hybrid.repo.dir>
+                    </systemPropertyVariables>
+                    <environmentVariables>
+                        <!-- Playwright only attaches over CDP: it needs none of its own browsers. -->
+                        <PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD>1</PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD>
+                    </environmentVariables>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
