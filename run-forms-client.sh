@@ -40,7 +40,10 @@ mkdir -p "$DIR"
 # after it is redeployed, so drop the cached copy (frmall.jar stays cached).
 find "${TMPDIR:-/tmp}/frmsal" -name hybrid-bean.jar -delete 2>/dev/null || true
 # Always fetch frmsal.jar from the server, so it matches its Forms version.
-curl -sf -o "$DIR/frmsal.jar" "$HYBRID_FORMS_URL/java/frmsal.jar"
+curl -sf -o "$DIR/frmsal.jar" "$HYBRID_FORMS_URL/java/frmsal.jar" || {
+  echo "Cannot download frmsal.jar from $HYBRID_FORMS_URL (set HYBRID_FORMS_URL for a remote server)" >&2
+  exit 1
+}
 # shellcheck disable=SC2086  # both are lists of options
 exec "$JAVA" $ADD_OPENS ${JAVA_OPTS:-} -jar "$DIR/frmsal.jar" \
   -url "$HYBRID_FORMS_URL/frmservlet?config=${HYBRID_FORMS_CONFIG:-hybrid}${HYBRID_FORMS_PARAMS:-}" -t 10000
