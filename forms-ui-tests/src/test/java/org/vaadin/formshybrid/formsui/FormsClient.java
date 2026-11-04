@@ -88,6 +88,15 @@ public final class FormsClient {
         call("POST", "/press?key=" + encode(key) + "&with=" + encode(String.join(",", modifiers)));
     }
 
+    /**
+     * The Forms message line, for example what MESSAGE() showed, or "" if there
+     * is none. The status bars' other texts (such as "Record: 1/?") come after it.
+     */
+    public String message() {
+        String[] lines = call("GET", "/status").split("\n");
+        return lines.length > 1 ? lines[0] : "";
+    }
+
     /** The item that has the keyboard focus, for example {@code CUSTOMERS_NAME_1}, or "" if none. */
     public String focusedItem() {
         return call("GET", "/focus").split("\t", -1)[0];

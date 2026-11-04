@@ -44,6 +44,7 @@ import com.sun.net.httpserver.HttpServer;
  * <li>{@code GET /ping}: "ok"</li>
  * <li>{@code GET /items}: one "name&lt;tab&gt;value" line per named item on screen</li>
  * <li>{@code GET /item?name=CUSTOMERS_ID_0}: the item's value, 404 if not on screen</li>
+ * <li>{@code GET /status}: the texts of the Forms status bars, one per line, the message line first</li>
  * <li>{@code GET /focus}: "item&lt;tab&gt;window title" of the focus owner and the active window</li>
  * <li>{@code POST /activate}: activates the Forms window for real (see {@link #activateNatively()})</li>
  * <li>{@code POST /click?name=CUSTOMERS_NAME_2}: clicks the item, as a user would</li>
@@ -90,6 +91,7 @@ public final class FormsAgent {
         server.createContext("/ping", exchange -> reply(exchange, 200, "ok"));
         server.createContext("/items", exchange -> reply(exchange, 200, onEventThread(FormsAgent::items)));
         server.createContext("/focus", exchange -> reply(exchange, 200, onEventThread(FormsAgent::focus)));
+        server.createContext("/status", exchange -> reply(exchange, 200, onEventThread(FormsAgent::status)));
         server.createContext("/activate", exchange -> {
             boolean active = activateNatively();
             reply(exchange, active ? 200 : 409, active ? "ok"
@@ -286,6 +288,46 @@ public final class FormsAgent {
             }
         }
         return false;
+    }
+
+    /**
+     * The texts of the Forms status bars, one line each, the message line first.
+     * They are oracle.ewt.statusBar.StatusBar containers of StatusBarTextItem,
+     * which aren't AWT components, so read them through EWT's public API.
+     */
+    private static String status() {
+        StringBuilder lines = new StringBuilder();
+        for (Window window : Window.getWindows()) {
+            collectStatus(window, lines);
+        }
+        return lines.toString();
+    }
+
+    private static void collectStatus(Component component, StringBuilder lines) {
+        if (!component.isShowing()) {
+            return;
+        }
+        if (component.getClass().getName().equals("oracle.ewt.statusBar.StatusBar")) {
+            try {
+                int count = (Integer) component.getClass().getMethod("getItemCount").invoke(component);
+                for (int i = 0; i < count; i++) {
+                    Object item = component.getClass().getMethod("getItem", int.class).invoke(component, i);
+                    Object text = item.getClass().getMethod("getText").invoke(item);
+                    if (text != null && !text.toString().isBlank()) {
+                        lines.append(text).append('\n');
+                    }
+                }
+            } catch (NoSuchMethodException e) {
+                // an item without text, such as a progress indicator
+            } catch (ReflectiveOperationException e) {
+                lines.append("[can't read the status bar: ").append(e).append("]\n");
+            }
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                collectStatus(child, lines);
+            }
+        }
     }
 
     private static String items() {
