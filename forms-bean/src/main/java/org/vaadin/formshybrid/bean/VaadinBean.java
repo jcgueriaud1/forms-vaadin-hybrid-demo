@@ -40,6 +40,7 @@ import oracle.forms.ui.VBean;
 
 import org.vaadin.formshybrid.contract.HelloCallable;
 import org.vaadin.formshybrid.contract.HybridEvents;
+import org.vaadin.formshybrid.contract.SignInCallable;
 
 /**
  * Forms bean area implementation that shows the embedded Vaadin view through
@@ -54,10 +55,16 @@ import org.vaadin.formshybrid.contract.HybridEvents;
  * <li>Vaadin → Forms: the view's {@code orderSaved} event raises
  * {@code ORDER_SAVED}; the trigger reads {@code ORDER_CUSTOMER_ID} and
  * {@code ORDERS_TOTAL}.</li>
+ * <li>Identity (#17): the view's {@code tokenNeeded} event raises
+ * {@code TOKEN_NEEDED}; the form sets {@code TOKEN} to a one-time token from
+ * the database, which the bean passes to {@link SignInCallable#signIn}. The bean
+ * never handles a user name.</li>
  * </ul>
  *
- * The view URL defaults to {@value #DEFAULT_URL} and can be overridden with the
- * {@code -Dhybrid.url=...} JVM option.
+ * The server URL defaults to {@value #DEFAULT_URL} and can be overridden with
+ * the {@code -Dhybrid.url=...} JVM option. The form picks the view with
+ * {@code SET_CUSTOM_PROPERTY(bean, 1, 'ROUTE', 'notes')}, best in
+ * WHEN-NEW-FORM-INSTANCE; the default is the root route.
  *
  * The view server may be down, slow or restarted (issue #13); Forms must keep
  * working regardless. The bean checks every {@value #PROBE_SECONDS} s that the
@@ -76,6 +83,9 @@ public class VaadinBean extends VBean {
     private static final ID ORDER_SAVED = ID.registerProperty("ORDER_SAVED");
     private static final ID ORDER_CUSTOMER_ID = ID.registerProperty("ORDER_CUSTOMER_ID");
     private static final ID ORDERS_TOTAL = ID.registerProperty("ORDERS_TOTAL");
+    private static final ID ROUTE = ID.registerProperty("ROUTE");
+    private static final ID TOKEN = ID.registerProperty("TOKEN");
+    private static final ID TOKEN_NEEDED = ID.registerProperty("TOKEN_NEEDED");
 
     static final String DEFAULT_URL = "http://localhost:8080/";
     private static final int START_DELAY_MS = 1500;
@@ -109,7 +119,8 @@ public class VaadinBean extends VBean {
     private final AtomicInteger loads = new AtomicInteger();
 
     private IHandler handler;
-    private String url;
+    private final String baseUrl = System.getProperty("hybrid.url", DEFAULT_URL);
+    private volatile String route = "";
     private boolean started;
     private volatile JVaadinPanel panel;
     private volatile boolean viewReady;
@@ -159,8 +170,12 @@ public class VaadinBean extends VBean {
     }
 
     /** JCEF start-up is slow (and downloads Chromium on first run): never on the Forms thread. */
+    private String viewUrl() {
+        return baseUrl + route;
+    }
+
     private void startPanel() {
-        url = System.getProperty("hybrid.url", DEFAULT_URL);
+        String url = viewUrl();
         try {
             SwingVaadinClient.getConfiguration().setTimeout(CALL_TIMEOUT_SECONDS);
             BeanLog.debug("building panel for " + url);
@@ -173,8 +188,17 @@ public class VaadinBean extends VBean {
             p.addEventListener(HybridEvents.READY, e -> onViewReady());
             p.addEventListener(HybridEvents.GREET, this::onGreet);
             p.addEventListener(HybridEvents.ORDER_SAVED, this::onOrderSaved);
+            p.addEventListener(HybridEvents.TOKEN_NEEDED, e -> {
+                BeanLog.debug("token needed");
+                EventQueue.invokeLater(() -> dispatchCustomEvent(new CustomEvent(handler, TOKEN_NEEDED)));
+            });
             panel = p;
             BeanLog.debug("panel built, isReady=" + p.isReady());
+            if (!url.equals(viewUrl())) {
+                // ROUTE arrived while the panel was being built
+                viewReady = false;
+                EventQueue.invokeLater(this::loadView);
+            }
             // The page may have attached (and sent ready) before the listener
             // existed; swing-kit's ready flag covers that case.
             if (p.isReady()) {
@@ -288,7 +312,7 @@ public class VaadinBean extends VBean {
     private void loadView() {
         CefBrowser browser = BrowserKeyboard.browserOf(panel);
         if (browser != null) {
-            browser.loadURL(url);
+            browser.loadURL(viewUrl());
         } else {
             panel.reload();
         }
@@ -320,7 +344,7 @@ public class VaadinBean extends VBean {
      */
     private boolean serverAcceptsConnections() {
         try (Socket socket = new Socket()) {
-            URI uri = URI.create(url);
+            URI uri = URI.create(baseUrl);
             int port = uri.getPort() != -1 ? uri.getPort() : "https".equals(uri.getScheme()) ? 443 : 80;
             socket.connect(new InetSocketAddress(uri.getHost(), port), CONNECT_TIMEOUT_MS);
             return true;
@@ -353,6 +377,21 @@ public class VaadinBean extends VBean {
             String[] parts = String.valueOf(value).split("\\|", 2);
             currentCustomer = new String[] { parts[0], parts.length > 1 ? parts[1] : "" };
             pushCustomer();
+            return true;
+        }
+        if (id == ROUTE) {
+            BeanLog.debug("setProperty ROUTE = " + value);
+            route = value == null ? "" : value.toString();
+            if (panel != null) {
+                // the page already loaded another route: switch
+                viewReady = false;
+                EventQueue.invokeLater(this::loadView);
+            }
+            return true;
+        }
+        if (id == TOKEN) {
+            BeanLog.debug("setProperty TOKEN (not logged)");
+            signIn(String.valueOf(value));
             return true;
         }
         return super.setProperty(id, value);
@@ -410,6 +449,23 @@ public class VaadinBean extends VBean {
                 // Typically a timeout: the server is up but the page isn't
                 // answering (an expired session, a broken page). Reload it.
                 BeanLog.warn("showCustomer failed", t);
+                setAvailable(false, "the view didn't answer");
+            }
+        });
+    }
+
+    /** Passes a one-time token to the view; the view asked for it, so it's ready. */
+    private void signIn(String token) {
+        JVaadinPanel p = panel;
+        if (p == null || !available) {
+            return; // the view asks again when it (re)loads
+        }
+        calls.submit(() -> {
+            try {
+                p.as(SignInCallable.class).signIn(token);
+                BeanLog.debug("signIn returned");
+            } catch (Throwable t) {
+                BeanLog.warn("signIn failed", t);
                 setAvailable(false, "the view didn't answer");
             }
         });
