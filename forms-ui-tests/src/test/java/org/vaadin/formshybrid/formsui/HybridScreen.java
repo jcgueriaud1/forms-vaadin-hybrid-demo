@@ -75,18 +75,47 @@ public final class HybridScreen implements AutoCloseable {
 
     /** A single number from the demo schema, for example a count to compare the screen with. */
     public long queryLong(String sql, Object... parameters) {
+        return ((Number) queryRow(sql, parameters)[0]).longValue();
+    }
+
+    /**
+     * One row from the demo schema, through a new session: it sees only what
+     * was committed, as the other side of the hybrid screen would.
+     */
+    public Object[] queryRow(String sql, Object... parameters) {
         try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
-                PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (int i = 0; i < parameters.length; i++) {
-                statement.setObject(i + 1, parameters[i]);
+                PreparedStatement statement = prepare(connection, sql, parameters);
+                ResultSet result = statement.executeQuery()) {
+            if (!result.next()) {
+                throw new AssertionError("No row: " + sql);
             }
-            try (ResultSet result = statement.executeQuery()) {
-                result.next();
-                return result.getLong(1);
+            Object[] row = new Object[result.getMetaData().getColumnCount()];
+            for (int i = 0; i < row.length; i++) {
+                row[i] = result.getObject(i + 1);
             }
+            return row;
         } catch (SQLException e) {
             throw new AssertionError("Query failed: " + sql, e);
         }
+    }
+
+    /** Changes the demo schema and commits, for example to put back what a test changed. */
+    public int update(String sql, Object... parameters) {
+        try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+                PreparedStatement statement = prepare(connection, sql, parameters)) {
+            return statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new AssertionError("Update failed: " + sql, e);
+        }
+    }
+
+    private static PreparedStatement prepare(Connection connection, String sql, Object... parameters)
+            throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sql);
+        for (int i = 0; i < parameters.length; i++) {
+            statement.setObject(i + 1, parameters[i]);
+        }
+        return statement;
     }
 
     /** Why the tests can't run here, if the Docker environment isn't up. */
@@ -143,12 +172,15 @@ public final class HybridScreen implements AutoCloseable {
         waitFor("the first customer pushed by Forms", formsClient, "forms-client.log", Duration.ofMinutes(1),
                 () -> view.locator("h3").textContent().matches(".*\\(#\\d+\\)"));
         // Forms ignores clicks until its window has been active once, and macOS
-        // doesn't let an app started in the background activate itself. It usually
-        // is activated, unless another app is used while it starts.
-        System.out.println("Oracle Forms UI tests: waiting for the Forms window to be active. "
-                + "If it stays in the background, click it once.");
-        waitFor("active Forms window (macOS didn't bring it to the front: click it once while it starts)",
-                formsClient, "forms-client.log", Duration.ofMinutes(1), forms::isActive);
+        // doesn't let an app started in the background activate itself. The agent
+        // clicks its title bar, which needs Accessibility permission; without it,
+        // wait for the user to click the window.
+        if (!forms.activate()) {
+            System.out.println("Oracle Forms UI tests: the Forms window isn't active. Click it once, or give the app"
+                    + " that runs the tests (Terminal, your IDE) Accessibility permission in System Settings.");
+            waitFor("active Forms window (click it once, or grant Accessibility permission: see the README)",
+                    formsClient, "forms-client.log", Duration.ofMinutes(1), forms::isActive);
+        }
     }
 
     @Override

@@ -19,14 +19,17 @@ Verified on 2026-11-04 on macOS x86_64 against the real client.
    agent offers a local control port with commands to navigate, type, press keys
    and read items or the status bar. It finds components by name and posts the
    events a user's input produces to the client's AWT event queue, so Forms
-   triggers fire as they would for a user. It doesn't use `java.awt.Robot`, which
-   would move the real mouse and needs Accessibility permission on macOS.
-   On macOS, Forms ignores clicks until its window has been active once, and
-   macOS 15 doesn't let an app started in the background activate itself
-   (`Desktop.requestForeground` and System Events were both ignored). The harness
-   therefore waits until the window has been active, and asks for one click if it
-   isn't. After that, the agent re-activates the window for Java (window and
-   focus events) before each click, so you can switch to other apps.
+   triggers fire as they would for a user, without moving the real mouse.
+   One exception: on macOS, Forms ignores input until its window has had the
+   OS focus once (lightweight AWT and EWT components only take the focus when
+   their heavyweight window has it natively), and macOS 15 doesn't let an app
+   started in the background activate itself. `Desktop.requestForeground`,
+   System Events, and synthetic window, focus and EWT activation were all
+   ignored. So at startup the agent clicks the Forms window's title bar once
+   with `java.awt.Robot`, which needs Accessibility permission for the app the
+   tests run from. Without it, the harness asks the user to click the window.
+   After that, the agent re-activates the window for Java (window and focus
+   events) before each click, so the user can switch to other apps.
 2. **Component names come from `record=names`.** The harness adds
    `&record=names` through `HYBRID_FORMS_PARAMS`; the config already passes
    `record=%record%`. The Forms components are then named

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ParameterResolver;
 public final class HybridScreenExtension implements ExecutionCondition, BeforeAllCallback, ParameterResolver {
 
     private static final String UNAVAILABLE = "unavailable";
+    private static final String START_FAILURE = "startFailure";
 
     @Override
     public ConditionEvaluationResult evaluateExecutionCondition(ExtensionContext context) {
@@ -28,8 +29,18 @@ public final class HybridScreenExtension implements ExecutionCondition, BeforeAl
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
         ExtensionContext.Store store = store(context);
+        // A failed start is reported for every test class, but tried only once.
+        Throwable failure = store.get(START_FAILURE, Throwable.class);
+        if (failure != null) {
+            throw new AssertionError("The hybrid screen didn't start (see the first failing test)", failure);
+        }
         if (store.get(HybridScreen.class) == null) {
-            store.put(HybridScreen.class, HybridScreen.start());
+            try {
+                store.put(HybridScreen.class, HybridScreen.start());
+            } catch (Exception | Error e) {
+                store.put(START_FAILURE, e);
+                throw e;
+            }
         }
     }
 

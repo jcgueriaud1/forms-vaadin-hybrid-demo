@@ -1,14 +1,17 @@
 package org.vaadin.formshybrid.formsui.agent;
 
+import java.awt.AWTException;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.EventQueue;
 import java.awt.Frame;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
+import java.awt.Robot;
 import java.awt.Window;
 import java.awt.event.FocusEvent;
 import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
@@ -41,7 +44,12 @@ import com.sun.net.httpserver.HttpServer;
  * <li>{@code GET /ping}: "ok"</li>
  * <li>{@code GET /items}: one "name&lt;tab&gt;value" line per named item on screen</li>
  * <li>{@code GET /item?name=CUSTOMERS_ID_0}: the item's value, 404 if not on screen</li>
+ * <li>{@code GET /focus}: "item&lt;tab&gt;window title" of the focus owner and the active window</li>
+ * <li>{@code POST /activate}: activates the Forms window for real (see {@link #activateNatively()})</li>
  * <li>{@code POST /click?name=CUSTOMERS_NAME_2}: clicks the item, as a user would</li>
+ * <li>{@code POST /press?key=F11&with=CTRL}: presses a key (a {@code KeyEvent.VK_} name, with optional
+ * CTRL, SHIFT, ALT) in the focused item. Forms maps keys to functions in fmrweb.res: Ctrl+F11 is
+ * Execute Query.</li>
  * </ul>
  */
 public final class FormsAgent {
@@ -78,6 +86,12 @@ public final class FormsAgent {
         server.createContext("/ping", exchange -> reply(exchange, 200, "ok"));
         server.createContext("/items", exchange -> reply(exchange, 200, onEventThread(FormsAgent::items)));
         server.createContext("/focus", exchange -> reply(exchange, 200, onEventThread(FormsAgent::focus)));
+        server.createContext("/activate", exchange -> {
+            boolean active = activateNatively();
+            reply(exchange, active ? 200 : 409, active ? "ok"
+                    : "the Forms window isn't active: give the app that runs the tests (Terminal, your IDE)"
+                            + " Accessibility permission in System Settings, or click the window");
+        });
         server.createContext("/item", exchange -> {
             String name = query(exchange).get("name");
             String value = onEventThread(() -> {
@@ -109,6 +123,44 @@ public final class FormsAgent {
                 return true;
             });
             reply(exchange, clicked ? 200 : 404, clicked ? "ok" : "no item " + name + " on screen");
+        });
+        server.createContext("/press", exchange -> {
+            String key = query(exchange).get("key");
+            int keyCode;
+            try {
+                keyCode = KeyEvent.class.getField("VK_" + key).getInt(null);
+            } catch (ReflectiveOperationException | NullPointerException e) {
+                reply(exchange, 400, "unknown key " + key + ": use a KeyEvent.VK_ name without VK_, e.g. F8");
+                return;
+            }
+            int modifiers = 0;
+            for (String modifier : query(exchange).getOrDefault("with", "").split(",")) {
+                switch (modifier.trim().toUpperCase()) {
+                    case "" -> { }
+                    case "CTRL" -> modifiers |= InputEvent.CTRL_DOWN_MASK;
+                    case "SHIFT" -> modifiers |= InputEvent.SHIFT_DOWN_MASK;
+                    case "ALT" -> modifiers |= InputEvent.ALT_DOWN_MASK;
+                    default -> {
+                        reply(exchange, 400, "unknown modifier " + modifier + ": use CTRL, SHIFT or ALT");
+                        return;
+                    }
+                }
+            }
+            int keyModifiers = modifiers;
+            Component owner = onEventThread(() -> KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
+            if (owner == null) {
+                reply(exchange, 409, "no Forms item has the focus: click one first");
+                return;
+            }
+            if (!activate(SwingUtilities.getWindowAncestor(owner))) {
+                reply(exchange, 409, "the Forms window didn't become active, so it can't take a key");
+                return;
+            }
+            onEventThread(() -> {
+                press(owner, keyCode, keyModifiers);
+                return null;
+            });
+            reply(exchange, 200, "ok");
         });
         server.setExecutor(null);
         server.start();
@@ -152,6 +204,72 @@ public final class FormsAgent {
         Window active = focus.getActiveWindow();
         return (owner == null ? "" : owner.getName()) + '\t'
                 + (active instanceof Frame frame ? frame.getTitle() : active == null ? "" : active.getName());
+    }
+
+    /**
+     * Activates the Forms window for real, once, at startup. Forms only takes
+     * input in a window that has had the OS focus, and macOS 15 doesn't let an
+     * app started in the background activate itself. A click on the title bar
+     * does, through java.awt.Robot: it moves the mouse once and needs
+     * Accessibility permission (without it, macOS drops the click silently).
+     */
+    private static boolean activateNatively() {
+        Window window = onEventThread(FormsAgent::formsWindow);
+        if (window == null) {
+            return false;
+        }
+        if (onEventThread(window::isActive)) {
+            return true;
+        }
+        try {
+            Point corner = onEventThread(window::getLocationOnScreen);
+            int x = corner.x + onEventThread(window::getWidth) / 2;
+            int y = corner.y + Math.max(onEventThread(() -> window.getInsets().top) / 2, 5);
+            Robot robot = new Robot();
+            robot.mouseMove(x, y);
+            robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+            robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+        } catch (AWTException | SecurityException e) {
+            System.err.println("[forms-agent] can't click the Forms window: " + e);
+        }
+        long deadline = System.currentTimeMillis() + 3000;
+        while (System.currentTimeMillis() < deadline) {
+            if (onEventThread(window::isActive)) {
+                return true;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /** The window that shows the Forms items. */
+    private static Window formsWindow() {
+        for (Window window : Window.getWindows()) {
+            if (window.isShowing() && containsItem(window)) {
+                return window;
+            }
+        }
+        return null;
+    }
+
+    private static boolean containsItem(Component component) {
+        String name = component.getName();
+        if (name != null && ITEM_NAME.matcher(name).matches()) {
+            return true;
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                if (containsItem(child)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String items() {
@@ -236,6 +354,14 @@ public final class FormsAgent {
         queue.postEvent(mouse(window, MouseEvent.MOUSE_PRESSED, now, point, InputEvent.BUTTON1_DOWN_MASK));
         queue.postEvent(mouse(window, MouseEvent.MOUSE_RELEASED, now + 1, point, 0));
         queue.postEvent(mouse(window, MouseEvent.MOUSE_CLICKED, now + 2, point, 0));
+    }
+
+    /** Presses and releases a key, with modifiers held, in the item that has the focus. */
+    private static void press(Component owner, int keyCode, int modifiers) {
+        long now = System.currentTimeMillis();
+        EventQueue queue = owner.getToolkit().getSystemEventQueue();
+        queue.postEvent(new KeyEvent(owner, KeyEvent.KEY_PRESSED, now, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED));
+        queue.postEvent(new KeyEvent(owner, KeyEvent.KEY_RELEASED, now + 1, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED));
     }
 
     private static MouseEvent mouse(Window window, int id, long when, Point point, int modifiers) {

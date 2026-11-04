@@ -35,6 +35,19 @@ public final class FormsClient {
     }
 
     /**
+     * Activates the Forms window with a real click on its title bar. False if
+     * macOS dropped the click: the app running the tests has no Accessibility
+     * permission.
+     */
+    boolean activate() {
+        try {
+            return send("POST", "/activate").statusCode() == 200;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
      * Whether a Forms window is active. Forms ignores clicks until its window has
      * been active once; after that, the agent's clicks work even in the background.
      */
@@ -63,6 +76,20 @@ public final class FormsClient {
     /** Clicks an item, as a user would: Forms navigates there and fires its triggers. */
     public void click(String blockItem, int row) {
         call("POST", "/click?name=" + encode(blockItem + "_" + row));
+    }
+
+    /**
+     * Presses a key in the focused item, by its {@code KeyEvent.VK_} name without
+     * "VK_", with modifiers such as "CTRL". Forms maps keys to functions in the
+     * server's fmrweb.res: {@code press("F11", "CTRL")} is Execute Query.
+     */
+    public void press(String key, String... modifiers) {
+        call("POST", "/press?key=" + encode(key) + "&with=" + encode(String.join(",", modifiers)));
+    }
+
+    /** The item that has the keyboard focus, for example {@code CUSTOMERS_NAME_1}, or "" if none. */
+    public String focusedItem() {
+        return call("GET", "/focus").split("\t", -1)[0];
     }
 
     /** The visible row that shows the record whose key item has this value. */

@@ -126,12 +126,13 @@ mvn -Pforms-ui-tests -pl forms-ui-tests verify
 - **The reset disconnects a demo you have open.** Its Forms client loses its
   database session; restart it afterwards. A `hello-view` you have running
   reconnects by itself.
-- **macOS: the Forms window must come to the front once.** Forms ignores
-  clicks until its window has been active, and macOS doesn't let an app
-  started in the background activate itself. Started from a terminal or IDE
-  that is in front, it usually is. If not, the tests wait up to a minute and
-  print "click it once": click the Forms window. After that, clicks reach Forms
-  even if you switch to another app (the agent re-activates the window for Java).
+- **macOS: give the app you run the tests from Accessibility permission**
+  (System Settings › Privacy & Security › Accessibility: Terminal, iTerm, your
+  IDE). Forms ignores input until its window has been active once, and macOS
+  doesn't let an app started in the background activate itself. With the
+  permission, the agent clicks the Forms window's title bar once at startup
+  (the mouse moves once). Without it, the tests wait up to a minute for you to
+  click the window. After that, you can switch to other apps while they run.
 - Logs of the started processes: `forms-ui-tests/target/forms-ui-tests/`.
 
 ## Gotchas
