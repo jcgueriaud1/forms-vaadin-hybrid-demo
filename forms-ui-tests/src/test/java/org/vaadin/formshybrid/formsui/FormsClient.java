@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -75,7 +76,7 @@ public final class FormsClient {
 
     /** Clicks an item, as a user would: Forms navigates there and fires its triggers. */
     public void click(String blockItem, int row) {
-        call("POST", "/click?name=" + encode(blockItem + "_" + row));
+        clickUntilFocused(blockItem + "_" + row, "/click?name=");
     }
 
     /**
@@ -90,6 +91,50 @@ public final class FormsClient {
     /** The item that has the keyboard focus, for example {@code CUSTOMERS_NAME_1}, or "" if none. */
     public String focusedItem() {
         return call("GET", "/focus").split("\t", -1)[0];
+    }
+
+    /**
+     * A real click (java.awt.Robot) on an item: unlike {@link #click}, it moves
+     * the OS focus, for example back from the embedded browser. Needs the Forms
+     * window in front and Accessibility permission on macOS.
+     */
+    public void nativeClick(String blockItem, int row) {
+        clickUntilFocused(blockItem + "_" + row, "/native/click?name=");
+    }
+
+    /**
+     * Clicks, then waits for the focus to land on the item. While the client
+     * still finishes a round trip to the Forms server (the previous navigation),
+     * it can put the focus back where the server said, undoing the click. A user
+     * would click again, and so does this, once.
+     */
+    private void clickUntilFocused(String name, String path) {
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            call("POST", path + encode(name));
+            Instant deadline = Instant.now().plusSeconds(3);
+            while (Instant.now().isBefore(deadline)) {
+                if (name.equals(focusedItem())) {
+                    return;
+                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+        throw new AssertionError("Clicked " + name + " twice, but the focus is on " + focusedItem());
+    }
+
+    /** A real click at a point of the embedded view, in the page's CSS pixels (as Playwright gives them). */
+    public void nativeClickInView(double x, double y, int count) {
+        call("POST", "/native/click?view=" + encode(x + "," + y) + "&count=" + count);
+    }
+
+    /** Real key presses, such as "UP" or "META+A", into whatever has the OS focus. */
+    public void nativeKeys(String... keys) {
+        call("POST", "/native/keys?keys=" + encode(String.join(",", keys)));
     }
 
     /** The visible row that shows the record whose key item has this value. */

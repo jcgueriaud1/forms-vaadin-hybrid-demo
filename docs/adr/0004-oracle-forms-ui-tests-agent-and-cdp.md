@@ -30,6 +30,13 @@ Verified on 2026-11-04 on macOS x86_64 against the real client.
    tests run from. Without it, the harness asks the user to click the window.
    After that, the agent re-activates the window for Java (window and focus
    events) before each click, so the user can switch to other apps.
+   The other exception is the keyboard handover between Forms and the
+   embedded browser (#29): the bean decides who has the keyboard from native
+   mouse presses, which posted events never produce. That test clicks and
+   presses keys with `Robot` too (`/native/click`, `/native/keys`), with arrow
+   keys so it doesn't depend on the keyboard layout. `Robot` can't double-click
+   on macOS (it doesn't set the click count), so dialogs are opened through
+   Playwright after a native single click.
 2. **Component names come from `record=names`.** The harness adds
    `&record=names` through `HYBRID_FORMS_PARAMS`; the config already passes
    `record=%record%`. The Forms components are then named

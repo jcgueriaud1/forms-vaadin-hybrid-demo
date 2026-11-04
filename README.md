@@ -132,7 +132,10 @@ mvn -Pforms-ui-tests -pl forms-ui-tests verify
   doesn't let an app started in the background activate itself. With the
   permission, the agent clicks the Forms window's title bar once at startup
   (the mouse moves once). Without it, the tests wait up to a minute for you to
-  click the window. After that, you can switch to other apps while they run.
+  click the window. After that, you can switch to other apps while most tests
+  run, but not during `KeyboardFocusIT`: it checks the keyboard handover
+  between Forms and the browser with real clicks and keys, which go to the app
+  in front.
 - Logs of the started processes: `forms-ui-tests/target/forms-ui-tests/`.
 
 ## Gotchas

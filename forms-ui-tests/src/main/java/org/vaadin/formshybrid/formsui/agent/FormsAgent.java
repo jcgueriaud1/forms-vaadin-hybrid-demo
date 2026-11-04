@@ -47,6 +47,10 @@ import com.sun.net.httpserver.HttpServer;
  * <li>{@code GET /focus}: "item&lt;tab&gt;window title" of the focus owner and the active window</li>
  * <li>{@code POST /activate}: activates the Forms window for real (see {@link #activateNatively()})</li>
  * <li>{@code POST /click?name=CUSTOMERS_NAME_2}: clicks the item, as a user would</li>
+ * <li>{@code POST /native/click?name=CUSTOMERS_NAME_1}, {@code POST /native/click?view=120,80&count=2}: a
+ * real click (java.awt.Robot) on an item, or at a point of the embedded view in CSS pixels; see
+ * {@link NativeInput}</li>
+ * <li>{@code POST /native/keys?keys=UP,META+A}: real key presses</li>
  * <li>{@code POST /press?key=F11&with=CTRL}: presses a key (a {@code KeyEvent.VK_} name, with optional
  * CTRL, SHIFT, ALT) in the focused item. Forms maps keys to functions in fmrweb.res: Ctrl+F11 is
  * Execute Query.</li>
@@ -162,6 +166,18 @@ public final class FormsAgent {
             });
             reply(exchange, 200, "ok");
         });
+        server.createContext("/native/click", exchange -> {
+            Map<String, String> query = query(exchange);
+            int count = Integer.parseInt(query.getOrDefault("count", "1"));
+            String result = query.containsKey("view")
+                    ? NativeInput.clickView(query.get("view"), count)
+                    : NativeInput.clickItem(query.get("name"), count);
+            reply(exchange, result == null ? 200 : 409, result == null ? "ok" : result);
+        });
+        server.createContext("/native/keys", exchange -> {
+            String result = NativeInput.keys(query(exchange).get("keys"));
+            reply(exchange, result == null ? 200 : 409, result == null ? "ok" : result);
+        });
         server.setExecutor(null);
         server.start();
         System.err.println("[forms-agent] control port " + port);
@@ -213,7 +229,7 @@ public final class FormsAgent {
      * does, through java.awt.Robot: it moves the mouse once and needs
      * Accessibility permission (without it, macOS drops the click silently).
      */
-    private static boolean activateNatively() {
+    static boolean activateNatively() {
         Window window = onEventThread(FormsAgent::formsWindow);
         if (window == null) {
             return false;
@@ -248,7 +264,7 @@ public final class FormsAgent {
     }
 
     /** The window that shows the Forms items. */
-    private static Window formsWindow() {
+    static Window formsWindow() {
         for (Window window : Window.getWindows()) {
             if (window.isShowing() && containsItem(window)) {
                 return window;
@@ -295,7 +311,7 @@ public final class FormsAgent {
         }
     }
 
-    private static Component find(String name) {
+    static Component find(String name) {
         for (Window window : Window.getWindows()) {
             Component found = find(window, name);
             if (found != null) {
@@ -368,11 +384,11 @@ public final class FormsAgent {
         return new MouseEvent(window, id, when, modifiers, point.x, point.y, 1, false, MouseEvent.BUTTON1);
     }
 
-    private interface Task<T> {
+    interface Task<T> {
         T run();
     }
 
-    private static <T> T onEventThread(Task<T> task) {
+    static <T> T onEventThread(Task<T> task) {
         AtomicReference<T> result = new AtomicReference<>();
         try {
             EventQueue.invokeAndWait(() -> result.set(task.run()));
