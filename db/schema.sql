@@ -6,8 +6,12 @@
 WHENEVER SQLERROR EXIT FAILURE
 
 -- Disconnect running demo sessions (the forms, the view's connection pool),
--- or DROP USER fails with ORA-01940.
+-- or DROP USER fails with ORA-01940. Lock the accounts first: a running view's
+-- connection pool reconnects as soon as its sessions are killed.
 BEGIN
+  FOR u IN (SELECT username FROM dba_users WHERE username IN ('HYBRID', 'ALICE', 'BOB')) LOOP
+    EXECUTE IMMEDIATE 'ALTER USER ' || u.username || ' ACCOUNT LOCK';
+  END LOOP;
   FOR s IN (SELECT sid, serial# AS serial FROM v$session
             WHERE username IN ('HYBRID', 'ALICE', 'BOB')) LOOP
     EXECUTE IMMEDIATE 'ALTER SYSTEM KILL SESSION ''' || s.sid || ',' || s.serial || ''' IMMEDIATE';
