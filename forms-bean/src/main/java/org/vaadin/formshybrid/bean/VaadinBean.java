@@ -8,6 +8,7 @@ import java.awt.Container;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
+import java.awt.event.ContainerEvent;
 import java.awt.EventQueue;
 import java.awt.event.HierarchyEvent;
 import java.io.IOException;
@@ -15,6 +16,9 @@ import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -32,6 +36,7 @@ import com.vaadin.swingkit.core.VaadinSwingEvent;
 
 import org.cef.browser.CefBrowser;
 
+import oracle.ewt.lwAWT.lwMenu.LWPopupMenu;
 import oracle.forms.handler.IHandler;
 import oracle.forms.properties.ID;
 import oracle.forms.ui.CustomEvent;
@@ -126,8 +131,12 @@ public class VaadinBean extends VBean {
     private volatile boolean viewReady;
     // false while the server is unreachable or the view stopped answering
     private volatile boolean available = true;
-    // a Forms dialog is over the bean (AWT thread only)
+    // a Forms dialog or menu is over the bean (AWT thread only)
     private boolean covered;
+    // what covers it is a menu, not a dialog (AWT thread only)
+    private boolean menuOpen;
+    // the Forms menus seen so far, to check which are open (AWT thread only)
+    private final Set<LWPopupMenu> menus = Collections.newSetFromMap(new WeakHashMap<>());
     private volatile String[] currentCustomer;
     private volatile String greeting = "";
     private volatile String orderCustomerId = "";
@@ -226,6 +235,11 @@ public class VaadinBean extends VBean {
      * dialog over the bean area would be hidden while Forms waits for an answer.
      * While another visible Forms window overlaps the bean, the browser is
      * replaced by a placeholder (issue #6).
+     *
+     * The form's menus have the same problem: a dropdown is a lightweight EWT
+     * {@link LWPopupMenu} that the browser would paint over, so the menu
+     * couldn't be read or clicked. While one is open over the bean, the browser
+     * is hidden too.
      */
     private void watchFormsDialogs() {
         FWindow own = ancestor(this, FWindow.class);
@@ -236,7 +250,15 @@ public class VaadinBean extends VBean {
         }
         dialogWatcher = e -> {
             Object source = e.getSource();
-            if (source == desktop || source instanceof FWindow) {
+            Object child = e instanceof ContainerEvent ? ((ContainerEvent) e).getChild() : null;
+            if (source instanceof LWPopupMenu) {
+                menus.add((LWPopupMenu) source);
+            }
+            if (child instanceof LWPopupMenu) {
+                menus.add((LWPopupMenu) child);
+            }
+            if (source == desktop || source instanceof FWindow
+                    || source instanceof LWPopupMenu || child instanceof LWPopupMenu) {
                 updateForDialogs(own, desktop);
             }
         };
@@ -250,16 +272,26 @@ public class VaadinBean extends VBean {
             return;
         }
         Rectangle bean = javax.swing.SwingUtilities.convertRectangle(getParent(), getBounds(), desktop);
-        boolean now = false;
+        boolean dialog = false;
         for (Component c : desktop.getComponents()) {
             if (c != own && c instanceof FWindow && c.isVisible() && c.getBounds().intersects(bean)) {
-                now = true;
+                dialog = true;
                 break;
             }
         }
+        Rectangle beanOnScreen = new Rectangle(getLocationOnScreen(), getSize());
+        boolean menu = false;
+        for (LWPopupMenu m : menus) {
+            if (m.isShowing() && new Rectangle(m.getLocationOnScreen(), m.getSize()).intersects(beanOnScreen)) {
+                menu = true;
+                break;
+            }
+        }
+        menuOpen = menu && !dialog;
+        boolean now = dialog || menu;
         if (now != covered) {
             covered = now;
-            BeanLog.debug(covered ? "Forms dialog over the view: hiding the browser" : "Forms dialog closed: showing the browser");
+            BeanLog.debug(covered ? "Forms dialog or menu over the view: hiding the browser" : "Forms dialog or menu closed: showing the browser");
             if (covered && keyboard != null) {
                 keyboard.formsTookFocus();
             }
@@ -277,7 +309,7 @@ public class VaadinBean extends VBean {
             return;
         }
         if (covered) {
-            status.setText("Answer the Forms dialog to continue.");
+            status.setText(menuOpen ? "" : "Answer the Forms dialog to continue.");
         } else if (!available) {
             status.setText("<html><center>The Vaadin view isn't available.<br>"
                     + "Forms keeps working; the view comes back by itself.</center></html>");

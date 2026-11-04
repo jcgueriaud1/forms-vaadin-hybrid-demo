@@ -129,6 +129,10 @@ and swing-kit logs its calls and events (at debug level) on the console.
   dialog to continue.") instead of the browser until they close. Reproduce with
   `HYBRID_FORMS_PARAMS='&otherparams=alert_test=YES' ./run-forms-client.sh`: an
   alert opens 12 seconds after start.
+  The form's menus have the same problem: a dropdown is a lightweight EWT
+  popup, so the browser would hide it and the menu couldn't be clicked. While
+  a menu is open over the bean area, the browser is hidden (a blank
+  placeholder) until it closes.
 - **When the Vaadin server is down, slow or restarted, Forms keeps working.**
   The bean checks every 5 s that the server accepts connections (a TCP
   connect, so no Vaadin session per check), and treats a page that fails to
