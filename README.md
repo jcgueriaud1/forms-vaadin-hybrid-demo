@@ -136,6 +136,9 @@ mvn -Pforms-ui-tests -pl forms-ui-tests verify
   run, but not during `KeyboardFocusIT`: it checks the keyboard handover
   between Forms and the browser with real clicks and keys, which go to the app
   in front.
+- **Don't lock the screen while they run:** a locked screen stops the embedded
+  browser and real input. The tests keep the display awake (`caffeinate`), so
+  macOS doesn't lock it on its own.
 - Logs of the started processes: `forms-ui-tests/target/forms-ui-tests/`.
 
 ## Gotchas

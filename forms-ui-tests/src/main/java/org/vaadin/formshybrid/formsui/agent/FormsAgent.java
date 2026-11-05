@@ -21,7 +21,9 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
@@ -48,6 +50,9 @@ import com.sun.net.httpserver.HttpServer;
  * <li>{@code GET /focus}: "item&lt;tab&gt;window title" of the focus owner and the active window</li>
  * <li>{@code POST /activate}: activates the Forms window for real (see {@link #activateNatively()})</li>
  * <li>{@code POST /click?name=CUSTOMERS_NAME_2}: clicks the item, as a user would</li>
+ * <li>{@code POST /type?text=abc}: types text into the focused item</li>
+ * <li>{@code POST /logon?user=alice&password=alice&database=}: fills in the Forms logon dialog and
+ * connects</li>
  * <li>{@code POST /native/click?name=CUSTOMERS_NAME_1}, {@code POST /native/click?view=120,80&count=2}: a
  * real click (java.awt.Robot) on an item, or at a point of the embedded view in CSS pixels; see
  * {@link NativeInput}</li>
@@ -168,6 +173,25 @@ public final class FormsAgent {
             });
             reply(exchange, 200, "ok");
         });
+        server.createContext("/type", exchange -> {
+            String text = query(exchange).getOrDefault("text", "");
+            Component owner = onEventThread(() -> KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
+            if (owner == null) {
+                reply(exchange, 409, "nothing has the focus: click an item first");
+                return;
+            }
+            onEventThread(() -> {
+                type(owner, text);
+                return null;
+            });
+            reply(exchange, 200, "ok");
+        });
+        server.createContext("/logon", exchange -> {
+            Map<String, String> query = query(exchange);
+            String result = logon(query.getOrDefault("user", ""), query.getOrDefault("password", ""),
+                    query.getOrDefault("database", ""));
+            reply(exchange, result == null ? 200 : 409, result == null ? "ok" : result);
+        });
         server.createContext("/native/click", exchange -> {
             Map<String, String> query = query(exchange);
             int count = Integer.parseInt(query.getOrDefault("count", "1"));
@@ -213,6 +237,135 @@ public final class FormsAgent {
             }
         }
         return false;
+    }
+
+    /**
+     * Fills in the Forms logon dialog (Username, Password, Database, in that
+     * order) and presses Connect: each field is clicked and typed into, as a
+     * user would. Returns why it couldn't, or null.
+     */
+    private static String logon(String user, String password, String database) {
+        Component dialog = onEventThread(() -> find("Forms_Logon_Dialog"));
+        if (dialog == null) {
+            return "no Forms logon dialog on screen";
+        }
+        Window window = onEventThread(() -> SwingUtilities.getWindowAncestor(dialog));
+        if (!activateNatively() && !activate(window)) {
+            return "the Forms window isn't active";
+        }
+        List<Component> fields = onEventThread(() -> {
+            List<Component> found = new ArrayList<>();
+            collectByClass(dialog, "oracle.forms.ui.VTextField", found);
+            return found;
+        });
+        Component connect = onEventThread(() -> {
+            List<Component> buttons = new ArrayList<>();
+            collectByClass(dialog, "oracle.ewt.button.PushButton", buttons);
+            return buttons.stream().filter(b -> "Connect".equals(label(b))).findFirst().orElse(null);
+        });
+        if (fields.size() < 3 || connect == null) {
+            return "the logon dialog has " + fields.size() + " fields and " + (connect == null ? "no" : "a")
+                    + " Connect button";
+        }
+        String[] values = {user, password, database};
+        for (int i = 0; i < 3; i++) {
+            Component field = fields.get(i);
+            String value = values[i];
+            // Keys go to the focus owner, and the dialog sets its first focus on
+            // its own: type until the field holds exactly the value.
+            for (int attempt = 1; !value.equals(onEventThread(() -> text(field))); attempt++) {
+                if (attempt > 3) {
+                    return "couldn't type into logon field " + (i + 1) + ": it holds '"
+                            + onEventThread(() -> text(field)) + "'";
+                }
+                onEventThread(() -> {
+                    setText(field, "");
+                    click(field);
+                    return null;
+                });
+                waitForFocus(field);
+                onEventThread(() -> {
+                    type(field, value);
+                    return null;
+                });
+                sleep(200);
+            }
+        }
+        onEventThread(() -> {
+            click(connect);
+            return null;
+        });
+        return null;
+    }
+
+    private static void setText(Component component, String text) {
+        try {
+            component.getClass().getMethod("setText", String.class).invoke(component, text);
+        } catch (ReflectiveOperationException e) {
+            // no setText: typing appends to what is there, and the check reports it
+        }
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void waitForFocus(Component component) {
+        long deadline = System.currentTimeMillis() + 3000;
+        while (System.currentTimeMillis() < deadline
+                && onEventThread(() -> KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner()) != component) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
+    /**
+     * Types text into a component as the keyboard would: KEY_PRESSED, KEY_TYPED
+     * and KEY_RELEASED for each character, with the character set, so it
+     * doesn't depend on the keyboard layout as real keys would.
+     */
+    private static void type(Component component, String text) {
+        EventQueue queue = component.getToolkit().getSystemEventQueue();
+        long now = System.currentTimeMillis();
+        for (char c : text.toCharArray()) {
+            int code = KeyEvent.getExtendedKeyCodeForChar(c);
+            int shift = Character.isUpperCase(c) ? InputEvent.SHIFT_DOWN_MASK : 0;
+            queue.postEvent(new KeyEvent(component, KeyEvent.KEY_PRESSED, now++, shift, code, c));
+            queue.postEvent(new KeyEvent(component, KeyEvent.KEY_TYPED, now++, shift, KeyEvent.VK_UNDEFINED, c));
+            queue.postEvent(new KeyEvent(component, KeyEvent.KEY_RELEASED, now++, shift, code, c));
+        }
+    }
+
+    private static void collectByClass(Component component, String className, List<Component> found) {
+        if (!component.isShowing()) {
+            return;
+        }
+        if (component.getClass().getName().equals(className)) {
+            found.add(component);
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                collectByClass(child, className, found);
+            }
+        }
+    }
+
+    /** An EWT button's label (oracle.ewt.button.PushButton has getLabel(), not getText()). */
+    private static String label(Component component) {
+        try {
+            Object label = component.getClass().getMethod("getLabel").invoke(component);
+            return label == null ? "" : label.toString();
+        } catch (ReflectiveOperationException e) {
+            return "";
+        }
     }
 
     /** The component that has the keyboard, and the active window: "name&lt;tab&gt;window title". */
@@ -265,14 +418,43 @@ public final class FormsAgent {
         return false;
     }
 
-    /** The window that shows the Forms items. */
+    /**
+     * The window that shows the Forms items, or before the form opens, the one
+     * that shows a Forms window (the logon dialog is one). FSAL's own launcher
+     * frame shows neither.
+     */
     static Window formsWindow() {
+        Window withFormsWindow = null;
         for (Window window : Window.getWindows()) {
-            if (window.isShowing() && containsItem(window)) {
+            if (!window.isShowing()) {
+                continue;
+            }
+            if (containsItem(window)) {
                 return window;
             }
+            if (withFormsWindow == null && containsFormsWindow(window)) {
+                withFormsWindow = window;
+            }
         }
-        return null;
+        return withFormsWindow;
+    }
+
+    private static boolean containsFormsWindow(Component component) {
+        if (!component.isShowing()) {
+            return false;
+        }
+        String type = component.getClass().getName();
+        if (type.equals("oracle.forms.ui.FWindow") || type.equals("oracle.forms.ui.ExtendedFrame")) {
+            return true;
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                if (containsFormsWindow(child)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean containsItem(Component component) {

@@ -57,6 +57,18 @@ public final class FormsClient {
         return !ownerWindow[1].isEmpty();
     }
 
+    /**
+     * Fills in the Forms logon dialog and connects (the config has no userid).
+     * False while there is no logon dialog yet.
+     */
+    boolean logon(String user, String password) {
+        try {
+            return send("POST", "/logon?user=" + encode(user) + "&password=" + encode(password)).statusCode() == 200;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     /** Every named item on screen and its value, in screen order. */
     public Map<String, String> items() {
         Map<String, String> items = new LinkedHashMap<>();

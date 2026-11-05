@@ -14,11 +14,16 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.Page;
@@ -48,10 +53,8 @@ public final class HybridScreen implements AutoCloseable {
 
     private Process helloView;
     private int viewPort;
-    private Process formsClient;
     private Playwright playwright;
-    private FormsClient forms;
-    private Page view;
+    private Client main;
 
     static HybridScreen start() throws Exception {
         HybridScreen screen = new HybridScreen();
@@ -66,12 +69,54 @@ public final class HybridScreen implements AutoCloseable {
 
     /** The Forms client, through the agent. */
     public FormsClient forms() {
-        return forms;
+        return main.forms();
     }
 
     /** The embedded view's page, inside the Forms client. */
     public Page view() {
-        return view;
+        return main.view();
+    }
+
+    /**
+     * A Forms client started for one test, next to the shared one: on another
+     * config, logged in as {@code user} through the Forms logon dialog. Close it
+     * when done.
+     */
+    public Client startClient(String config, String user, String password) throws Exception {
+        return startClient(config, user, password, "forms-client-" + config + "-" + user + ".log",
+                view -> view.locator("h3").textContent().startsWith("Notes on"));
+    }
+
+    /** A running Forms client: the agent, the embedded view, and the process. */
+    public static final class Client implements AutoCloseable {
+
+        private final Process process;
+        private final FormsClient forms;
+        private final Browser browser;
+        private final Page view;
+
+        private Client(Process process, FormsClient forms, Browser browser, Page view) {
+            this.process = process;
+            this.forms = forms;
+            this.browser = browser;
+            this.view = view;
+        }
+
+        /** The Forms client, through the agent. */
+        public FormsClient forms() {
+            return forms;
+        }
+
+        /** The embedded view's page, inside the Forms client. */
+        public Page view() {
+            return view;
+        }
+
+        @Override
+        public void close() {
+            browser.close(); // over CDP this only disconnects
+            stop(process);
+        }
     }
 
     /** Stops the view's server (hello-view), as when it crashes or is redeployed. */
@@ -88,7 +133,9 @@ public final class HybridScreen implements AutoCloseable {
         // Append, so the log keeps the server's earlier lives too.
         File log = logs.resolve("hello-view.log").toFile();
         helloView = new ProcessBuilder("mvn", "-q", "-B", "spring-boot:run",
-                "-Dspring-boot.run.arguments=--server.port=" + viewPort)
+                // No dev tools: Copilot's overlay covers the view's corner, where
+                // the notes view has its Add note button, and users never see it.
+                "-Dspring-boot.run.arguments=--server.port=" + viewPort + " --vaadin.devmode.devTools.enabled=false")
                 .directory(repo.resolve("hello-view").toFile())
                 .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log)).start();
         String url = "http://localhost:" + viewPort + "/";
@@ -160,6 +207,16 @@ public final class HybridScreen implements AutoCloseable {
             throw new IllegalStateException("No agent jar at " + agentJar + ": run the tests with mvn verify");
         }
 
+        // A locked screen stops the embedded browser and real input, and macOS
+        // locks it when the display sleeps: keep it awake while the tests run.
+        if (System.getProperty("os.name", "").startsWith("Mac")) {
+            if (screenLocked()) {
+                throw new AssertionError("The screen is locked: unlock it, then run the tests again");
+            }
+            new ProcessBuilder("caffeinate", "-d", "-w", String.valueOf(ProcessHandle.current().pid()))
+                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        }
+
         // Before anything connects: the reset kills the HYBRID sessions.
         run(List.of("./setup-db.sh"), repo, "setup-db.log", Duration.ofMinutes(3));
 
@@ -168,48 +225,73 @@ public final class HybridScreen implements AutoCloseable {
         startView();
         String viewUrl = "http://localhost:" + viewPort + "/";
 
-        int controlPort = freePort();
-        int cdpPort = freePort();
-        ProcessBuilder client = new ProcessBuilder("./run-forms-client.sh").directory(repo.toFile());
-        String javaOpts = "-javaagent:" + agentJar.toAbsolutePath() + "=control=" + controlPort + ",cdp=" + cdpPort
-                + " -Dhybrid.url=" + viewUrl;
-        client.environment().merge("JAVA_OPTS", javaOpts, (existing, added) -> existing + " " + added);
-        client.environment().put("HYBRID_FORMS_PARAMS", "&record=names");
-        formsClient = start(client, "forms-client.log");
-        forms = new FormsClient(controlPort);
-        waitFor("the agent's control port", formsClient, "forms-client.log", Duration.ofMinutes(2), forms::isUp);
-        waitFor("the embedded browser's CDP port", formsClient, "forms-client.log", Duration.ofMinutes(2),
-                () -> answers("http://127.0.0.1:" + cdpPort + "/json/version"));
-
         playwright = Playwright.create();
-        Browser browser = playwright.chromium().connectOverCDP("http://127.0.0.1:" + cdpPort);
-        waitFor("the embedded view's page", formsClient, "forms-client.log", Duration.ofMinutes(1),
-                () -> browser.contexts().stream().flatMap(c -> c.pages().stream())
-                        .anyMatch(p -> p.url().startsWith(viewUrl)));
-        view = browser.contexts().stream().flatMap(c -> c.pages().stream())
-                .filter(p -> p.url().startsWith(viewUrl)).findFirst().orElseThrow();
         // Ready once Forms has pushed its first customer: the bean and the form's
         // triggers are up, so a click now isn't lost to a form still starting.
-        waitFor("the first customer pushed by Forms", formsClient, "forms-client.log", Duration.ofMinutes(1),
-                () -> view.locator("h3").textContent().matches(".*\\(#\\d+\\)"));
-        // Forms ignores clicks until its window has been active once, and macOS
-        // doesn't let an app started in the background activate itself. The agent
-        // clicks its title bar, which needs Accessibility permission; without it,
-        // wait for the user to click the window.
-        if (!forms.activate()) {
-            System.out.println("Oracle Forms UI tests: the Forms window isn't active. Click it once, or give the app"
-                    + " that runs the tests (Terminal, your IDE) Accessibility permission in System Settings.");
-            waitFor("active Forms window (click it once, or grant Accessibility permission: see the README)",
-                    formsClient, "forms-client.log", Duration.ofMinutes(1), forms::isActive);
+        main = startClient("hybrid", null, null, "forms-client.log",
+                view -> view.locator("h3").textContent().matches(".*\\(#\\d+\\)"));
+    }
+
+    private Client startClient(String config, String user, String password, String log, Predicate<Page> ready)
+            throws Exception {
+        String viewUrl = "http://localhost:" + viewPort + "/";
+        int controlPort = freePort();
+        int cdpPort = freePort();
+        ProcessBuilder builder = new ProcessBuilder("./run-forms-client.sh").directory(repo.toFile());
+        String javaOpts = "-javaagent:" + agentJar.toAbsolutePath() + "=control=" + controlPort + ",cdp=" + cdpPort
+                + " -Dhybrid.url=" + viewUrl;
+        builder.environment().merge("JAVA_OPTS", javaOpts, (existing, added) -> existing + " " + added);
+        builder.environment().put("HYBRID_FORMS_PARAMS", "&record=names");
+        builder.environment().put("HYBRID_FORMS_CONFIG", config);
+        Process process = start(builder, log);
+        try {
+            FormsClient forms = new FormsClient(controlPort);
+            waitFor("the agent's control port", process, log, Duration.ofMinutes(2), forms::isUp);
+            if (user != null) {
+                waitFor("the Forms logon dialog, and logging in as " + user, process, log, Duration.ofMinutes(1),
+                        () -> forms.logon(user, password));
+                waitFor("the form to open after logging in as " + user, process, log,
+                        Duration.ofMinutes(1), () -> !forms.items().isEmpty());
+            }
+            waitFor("the embedded browser's CDP port", process, log, Duration.ofMinutes(2),
+                    () -> answers("http://127.0.0.1:" + cdpPort + "/json/version"));
+            // Attach only once the browser has the view's page: Playwright doesn't
+            // reliably pick up a page created after it attached.
+            waitFor("the embedded view's page (" + viewUrl + ")", process, log, Duration.ofMinutes(1),
+                    () -> pageUrls(cdpPort).stream().anyMatch(url -> url.startsWith(viewUrl)));
+
+            Browser browser = playwright.chromium().connectOverCDP("http://127.0.0.1:" + cdpPort);
+            Page view = browser.contexts().stream().flatMap(c -> c.pages().stream())
+                    .filter(p -> p.url().startsWith(viewUrl)).findFirst()
+                    .orElseThrow(() -> new AssertionError("Playwright doesn't see the view's page; the browser has "
+                            + pageUrls(cdpPort)));
+            waitFor("the view to show the form's first record", process, log, Duration.ofMinutes(1),
+                    () -> ready.test(view));
+            // Forms ignores clicks until its window has been active once, and macOS
+            // doesn't let an app started in the background activate itself. The agent
+            // clicks its title bar, which needs Accessibility permission; without it,
+            // wait for the user to click the window.
+            if (!forms.activate()) {
+                System.out.println("Oracle Forms UI tests: the Forms window isn't active. Click it once, or give the"
+                        + " app that runs the tests (Terminal, your IDE) Accessibility permission in System Settings.");
+                waitFor("active Forms window (click it once, or grant Accessibility permission: see the README)",
+                        process, log, Duration.ofMinutes(1), forms::isActive);
+            }
+            return new Client(process, forms, browser, view);
+        } catch (Exception | Error e) {
+            stop(process);
+            throw e;
         }
     }
 
     @Override
     public void close() {
-        if (playwright != null) {
-            playwright.close(); // over CDP this only disconnects
+        if (main != null) {
+            main.close();
         }
-        stop(formsClient);
+        if (playwright != null) {
+            playwright.close();
+        }
         stop(helloView);
     }
 
@@ -275,6 +357,37 @@ public final class HybridScreen implements AutoCloseable {
         }
         process.descendants().forEach(ProcessHandle::destroyForcibly);
         process.destroyForcibly();
+    }
+
+    /** macOS: whether the session's screen is locked (ioreg's CGSSessionScreenIsLocked). */
+    private static boolean screenLocked() {
+        try {
+            Process ioreg = new ProcessBuilder("ioreg", "-n", "Root", "-d1").redirectErrorStream(true).start();
+            String out = new String(ioreg.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            return out.contains("\"CGSSessionScreenIsLocked\"=Yes");
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** The URLs of the browser's pages, from its CDP target list. */
+    private static List<String> pageUrls(int cdpPort) {
+        try {
+            HttpURLConnection connection = (HttpURLConnection) URI.create("http://127.0.0.1:" + cdpPort + "/json/list")
+                    .toURL().openConnection();
+            connection.setConnectTimeout(1000);
+            connection.setReadTimeout(5000);
+            String json = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            List<String> urls = new ArrayList<>();
+            Matcher pages = Pattern.compile("\"type\":\\s*\"page\"[^}]*?\"url\":\\s*\"([^\"]*)\"|\"url\":\\s*\"([^\"]*)\"[^}]*?\"type\":\\s*\"page\"")
+                    .matcher(json);
+            while (pages.find()) {
+                urls.add(pages.group(1) != null ? pages.group(1) : pages.group(2));
+            }
+            return urls;
+        } catch (IOException e) {
+            return List.of();
+        }
     }
 
     private static boolean answers(String url) {
